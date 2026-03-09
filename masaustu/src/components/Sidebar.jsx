@@ -45,7 +45,7 @@ const Sidebar = ({ currentPage, setCurrentPage }) => {
         ))}
       </nav>
       <div className="sidebar-footer">
-        v1.0 — Enterprise
+        v1.0.6 — Enterprise
       </div>
     </aside>
   );

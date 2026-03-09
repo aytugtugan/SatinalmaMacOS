@@ -37,9 +37,9 @@ const CustomTooltip = ({ active, payload, label }) => {
       ))}
       {/* teslim oranı'nı hesaplayıp tooltip'e ekle */}
       {payload.length >= 2 && (() => {
-        const siparis = payload.find(p => p.dataKey === 'siparisAdedi')?.value || 0;
-        const teslim = payload.find(p => p.dataKey === 'teslimEdilen')?.value || 0;
-        const oran = siparis > 0 ? ((teslim / siparis) * 100).toFixed(1) : '0.0';
+        const siparisVal = payload.find(p => p.dataKey === 'siparisAdedi')?.value || 0;
+        const teslimVal = payload.find(p => p.dataKey === 'teslimEdilen')?.value || 0;
+        const oran = siparisVal > 0 ? ((teslimVal / siparisVal) * 100).toFixed(1) : '0.0';
         return (
           <p style={{ margin: '7px 0 0', fontSize: '12px', display: 'flex', justifyContent: 'space-between', gap: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '7px' }}>
             <span style={{ color: '#6a6d70' }}>Teslim Oranı:</span>
