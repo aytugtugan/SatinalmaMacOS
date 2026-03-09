@@ -1,0 +1,86 @@
+{
+  "name": "satinalma-rapor",
+  "version": "1.0.2",
+  "description": "Satın Alma Rapor Uygulaması",
+  "main": "main.js",
+  "scripts": {
+    "start": "concurrently \"npm run webpack\" \"wait-on dist/bundle.js && electron .\"",
+    "webpack": "webpack --mode development --watch",
+    "build": "webpack --mode production && electron-builder && node scripts/embed-icon-exe.js",
+    "electron": "electron .",
+    "api": "node api/server.js"
+  },
+  "build": {
+    "appId": "com.satinalma.rapor",
+    "productName": "Satin Alma Rapor",
+    "directories": {
+      "output": "C:\\Users\\acemoglu\\Desktop"
+    },
+    "forceCodeSigning": false,
+    "win": {
+      "target": "nsis",
+      "icon": "assets\\icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "shortcutName": "Satin Alma Rapor"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "mustafabakoglu",
+        "repo": "Satin-alma",
+        "releaseType": "release"
+      }
+    ],
+    "files": [
+      "dist/**/*",
+      "main.js",
+      "preload.js",
+      "database.js",
+      "assets/**/*",
+      "ocak_2026_data.json",
+      "ocak_verileri_fixed.json",
+      "export_toplam_try.csv"
+    ]
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@ant-design/icons": "^5.6.1",
+    "antd": "^5.24.8",
+    "cors": "^2.8.6",
+    "dayjs": "^1.11.13",
+    "electron-updater": "^6.8.3",
+    "express": "^4.22.1",
+    "mssql": "^11.0.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "recharts": "^2.15.3"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.27.4",
+    "@babel/preset-env": "^7.27.2",
+    "@babel/preset-react": "^7.27.1",
+    "babel-loader": "^10.0.0",
+    "concurrently": "^9.2.1",
+    "cross-env": "^7.0.3",
+    "css-loader": "^7.1.2",
+    "electron": "^36.3.0",
+    "electron-builder": "^26.4.0",
+    "html-webpack-plugin": "^5.6.3",
+    "jimp": "^0.16.1",
+    "style-loader": "^4.0.0",
+    "to-ico": "^1.0.0",
+    "wait-on": "^8.0.5",
+    "webpack": "^5.99.9",
+    "webpack-cli": "^6.0.1"
+  }
+}
