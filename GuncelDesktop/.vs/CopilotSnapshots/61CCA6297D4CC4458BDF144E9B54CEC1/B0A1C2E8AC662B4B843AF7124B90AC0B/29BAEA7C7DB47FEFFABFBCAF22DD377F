@@ -1,0 +1,140 @@
+﻿import React from 'react';
+import { SwitchableChart, formatNumber, formatCurrency } from '../components/SwitchableChart';
+import {
+  ShoppingCartOutlined,
+  CalendarOutlined,
+  UserSwitchOutlined,
+  ClockCircleOutlined,
+} from '@ant-design/icons';
+
+const SiparisAnaliz = ({ data }) => {
+  if (!data) return null;
+
+  const { monthlyTrend, onaylayan, durum, summary, teslimatSuresi } = data;
+
+  // Aylık sipariş trendi
+  const trendData = (monthlyTrend || []).slice(0, 12).reverse().map(item => ({
+    name: item.ay,
+    value: item.siparisAdedi,
+  }));
+
+  // Aylık tutar trendi
+  const tutarTrendData = (monthlyTrend || []).slice(0, 12).reverse().map(item => ({
+    name: item.ay,
+    value: item.toplamTutar,
+  }));
+
+  // Onaylayan kişilere göre
+  const onaylayanData = (onaylayan || []).map(item => ({
+    name: item.onaylayan?.substring(0, 15) || 'Belirsiz',
+    value: item.siparisAdedi,
+  }));
+
+  // Onaylayan kişilere göre tutar
+  const onaylayanTutarData = (onaylayan || []).map(item => ({
+    name: item.onaylayan?.substring(0, 15) || 'Belirsiz',
+    value: item.toplamTutar,
+  }));
+
+  // Durum dağılımı
+  const durumData = (durum || []).map(item => ({
+    name: item.durum,
+    value: item.kayitAdedi,
+  }));
+
+  return (
+    <div>
+      <div className="page-header">
+        <h2>🛒 Sipariş Analizi</h2>
+        <p>Sipariş süreçlerinin detaylı analizi</p>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="kpi-grid">
+        <div className="kpi-card">
+          <div className="kpi-icon blue">
+            <ShoppingCartOutlined />
+          </div>
+          <div className="kpi-value">{formatNumber(summary?.totalSiparis || 0)}</div>
+          <div className="kpi-label">Toplam Sipariş</div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon green">
+            <CalendarOutlined />
+          </div>
+          <div className="kpi-value">{trendData.length}</div>
+          <div className="kpi-label">Aktif Ay Sayısı</div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon orange">
+            <UserSwitchOutlined />
+          </div>
+          <div className="kpi-value">{onaylayan?.length || 0}</div>
+          <div className="kpi-label">Onaylayan Kişi Sayısı</div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon purple">
+            <ClockCircleOutlined />
+          </div>
+          <div className="kpi-value">{teslimatSuresi?.ortalamaTeslimatSuresi || 0} Gün</div>
+          <div className="kpi-label">Ort. Teslimat Süresi</div>
+        </div>
+      </div>
+
+      {/* Charts */}
+      <div className="charts-grid">
+        <SwitchableChart
+          title="Aylık Sipariş Adedi Trendi"
+          data={trendData}
+          dataKey="value"
+          nameKey="name"
+          defaultType="line"
+          height={350}
+        />
+
+        <SwitchableChart
+          title="Aylık Sipariş Tutarı Trendi"
+          data={tutarTrendData}
+          dataKey="value"
+          nameKey="name"
+          defaultType="area"
+          valueFormatter={formatCurrency}
+          height={350}
+        />
+
+        <SwitchableChart
+          title="Onaylayan Kişilere Göre Sipariş Adedi"
+          data={onaylayanData}
+          dataKey="value"
+          nameKey="name"
+          defaultType="bar"
+          height={350}
+        />
+
+        <SwitchableChart
+          title="Onaylayan Kişilere Göre Tutar"
+          data={onaylayanTutarData}
+          dataKey="value"
+          nameKey="name"
+          defaultType="horizontal"
+          valueFormatter={formatCurrency}
+          height={350}
+        />
+
+        <SwitchableChart
+          title="Sipariş Durumu Dağılımı"
+          data={durumData}
+          dataKey="value"
+          nameKey="name"
+          defaultType="pie"
+          height={350}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default SiparisAnaliz;

@@ -1,0 +1,112 @@
+﻿const sql = require('mssql');
+
+const config = {
+  server: '10.35.20.15\\SQLSRV',
+  database: 'SNCG',
+  user: 'ozgur.copkur',
+  password: 'Oz2025!!',
+  options: {
+    encrypt: false,
+    trustServerCertificate: true,
+    enableArithAbort: true,
+  },
+  pool: {
+    max: 10,
+    min: 0,
+    idleTimeoutMillis: 30000,
+  },
+};
+
+let pool = null;
+let columnCache = null;
+
+async function getConnection() {
+  if (!pool) {
+    pool = await sql.connect(config);
+  }
+  return pool;
+}
+
+async function getColumnNames() {
+  if (columnCache) return columnCache;
+  const conn = await getConnection();
+  const result = await conn.request().query(
+    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'YLZ_TALEP_SIPARIS' ORDER BY ORDINAL_POSITION"
+  );
+  const cols = result.recordset.map(r => r.COLUMN_NAME);
+  // Heuristic mapping from DB column names to our keys
+  columnCache = {
+    TALEP_NO: cols.find(c => c.toUpperCase().includes('TALEP') && c.toUpperCase().includes('NUM')) || cols.find(c => c.toUpperCase().includes('TALEP')) || cols[0],
+    SIPARIS_NO: cols.find(c => c.toUpperCase().includes('SIPAR') && c.toUpperCase().includes('NUM')) || cols.find(c => c.toUpperCase().includes('SIPAR')) || cols[0],
+    TESLIM_TARIHI: cols.find(c => c.toUpperCase().includes('TESL') && c.toUpperCase().includes('TAR')) || cols.find(c => c.toUpperCase().includes('TESL')) || null,
+    TESLIM_EVRAK_NO: cols.find(c => c.toUpperCase().includes('TESL') && c.toUpperCase().includes('EVRAK')) || null,
+    CARI_UNVANI: cols.find(c => c.toUpperCase().includes('CARI')) || cols.find(c => c.toUpperCase().includes('TEDAR')) || null,
+    TOPLAM: cols.find(c => c.toUpperCase() === 'TOPLAM') || cols.find(c => c.toUpperCase().includes('TOPLAM')) || null,
+    SIPARIS_TARIHI: cols.find(c => c.toUpperCase().includes('SIPAR') && c.toUpperCase().includes('TAR')) || cols.find(c => c.toUpperCase().includes('TARIH')) || null,
+    TALEP_EDEN: cols.find(c => c.toUpperCase().includes('TALEP') && c.toUpperCase().includes('EDEN')) || null,
+    MASRAF_MERKEZI: cols.find(c => c.toUpperCase().includes('MASRAF')) || null,
+    PARA_BIRIMI: cols.find(c => c.toUpperCase().includes('PARA')) || null,
+    TUR: cols.find(c => c.toUpperCase() === 'TUR' || c.toUpperCase() === 'TÜR') || null,
+    TALEP_TARIHI: cols.find(c => c.toUpperCase().includes('TALEP') && c.toUpperCase().includes('TAR')) || null,
+    ISYERI: cols.find(c => c.toUpperCase().includes('ISYER') || c.toUpperCase().includes('İŞ YER')) || null,
+    SIPARIS_ONAYLAYAN: cols.find(c => c.toUpperCase().includes('ONAY') && c.toUpperCase().includes('SIPAR')) || null,
+    ODEME_VADESI: cols.find(c => c.toUpperCase().includes('VADE')) || null,
+    BIRIM_FIYAT: cols.find(c => c.toUpperCase().includes('BIRIM') && c.toUpperCase().includes('FIYAT')) || null,
+    MIKTAR: cols.find(c => c.toUpperCase().includes('MIKTAR') || c.toUpperCase().includes('MİKTAR')) || null,
+    SIPARIS_MALZEME: cols.find(c => c.toUpperCase().includes('MALZ')) || null,
+    BIRIM: cols.find(c => c.toUpperCase() === 'BIRIM' || c.toUpperCase() === 'BİRİM') || null,
+    AMBAR: cols.find(c => c.toUpperCase().includes('AMBAR')) || null,
+    // keep raw list for debugging
+    ALL: cols
+  };
+
+  // Wrap with square brackets for SQL usage
+  Object.keys(columnCache).forEach(k => {
+    if (k === 'ALL') return;
+    const v = columnCache[k];
+    if (v) columnCache[k] = '[' + v.replace(/\]/g, '') + ']';
+  });
+
+  console.log('Detected columns:', columnCache.ALL);
+  return columnCache;
+}
+
+async function executeQuery(query) {
+  const conn = await getConnection();
+  const result = await conn.request().query(query);
+  return result.recordset;
+}
+
+async function getAllData() {
+  const C = await getColumnNames();
+  const q = (col) => col ? col : 'NULL';
+  const select = C.ALL.map(name => '[' + name.replace(/\]/g, '') + '] AS ' + name.replace(/[^A-Za-z0-9_]/g, '_')).join(', ');
+  const data = await executeQuery('SELECT ' + select + ' FROM YLZ_TALEP_SIPARIS');
+  return { data, columns: C };
+}
+
+async function getAmbarList() {
+  const C = await getColumnNames();
+  const q = (col) => '[' + col.replace(/\]/g, '') + ']';
+  if (!C.AMBAR) return [];
+  const query = `SELECT DISTINCT ${C.AMBAR} as ambar FROM YLZ_TALEP_SIPARIS WHERE ${C.AMBAR} IS NOT NULL AND ${C.AMBAR} != '' ORDER BY ${C.AMBAR}`;
+  return await executeQuery(query);
+}
+
+async function getDashboardStats(filter) {
+  const conn = await getConnection();
+  const C = await getColumnNames();
+  const q = (col) => col ? col : null;
+
+  const whereClause = '';
+  const andClause = '';
+
+  const summaryQuery = `SELECT COUNT(DISTINCT ${C.TALEP_NO}) as totalTalep, COUNT(DISTINCT ${C.SIPARIS_NO}) as totalSiparis FROM YLZ_TALEP_SIPARIS${whereClause}`;
+  const [summary] = await Promise.all([
+    conn.request().query(summaryQuery)
+  ]).then(r => r);
+
+  return { summary: summary.recordset[0], columns: C };
+}
+
+module.exports = { executeQuery, getAllData, getDashboardStats, getAmbarList, getColumnMapping: getColumnNames };

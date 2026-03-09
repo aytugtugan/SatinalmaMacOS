@@ -1,0 +1,7 @@
+﻿const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  getData: (query) => ipcRenderer.invoke('get-data', query),
+  getAllData: () => ipcRenderer.invoke('get-all-data'),
+  getDashboardStats: () => ipcRenderer.invoke('get-dashboard-stats'),
+});

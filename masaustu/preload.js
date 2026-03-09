@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('api', {
   windowClose: () => ipcRenderer.invoke('window-close'),
   windowIsMaximized: () => ipcRenderer.invoke('window-is-maximized'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  onUpdateAvailable: (callback) => ipcRenderer.on('update-available', callback),
+  onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', callback),
+  onDownloadProgress: (callback) => ipcRenderer.on('download-progress', (_event, progress) => callback(progress)),
   // Dosya Yönetimi
   dosyaListele: (siparisNo) => ipcRenderer.invoke('dosya-listele', siparisNo),
   dosyaSayilari: (siparisNolar) => ipcRenderer.invoke('dosya-sayilari', siparisNolar),

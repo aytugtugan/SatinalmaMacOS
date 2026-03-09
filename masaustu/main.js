@@ -117,16 +117,17 @@ autoUpdater.on('download-progress', (progressObj) => {
 autoUpdater.on('update-downloaded', (info) => {
   console.log('Güncelleme indirildi, yeniden başlatılacak...');
   if (mainWindow) {
+    mainWindow.webContents.send('update-downloaded', info);
     dialog.showMessageBox(mainWindow, {
       type: 'info',
       title: 'Güncelleme Hazır',
-      message: 'Yeni sürüm indirildi. Uygulama şimdi yeniden başlatılacak.',
+      message: `Yeni sürüm (v${info.version}) indirildi. Uygulama şimdi yeniden başlatılacak.`,
       buttons: ['Tamam']
     }).then(() => {
-      autoUpdater.quitAndInstall();
+      autoUpdater.quitAndInstall(true, true);
     });
   } else {
-    autoUpdater.quitAndInstall();
+    autoUpdater.quitAndInstall(true, true);
   }
 });
 

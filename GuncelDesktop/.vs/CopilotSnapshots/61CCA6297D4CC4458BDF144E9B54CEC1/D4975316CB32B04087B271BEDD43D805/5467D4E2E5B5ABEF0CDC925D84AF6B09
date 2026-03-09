@@ -1,0 +1,86 @@
+﻿const { app, BrowserWindow, ipcMain } = require('electron');
+const path = require('path');
+const database = require('./database');
+
+let mainWindow;
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1600,
+    height: 900,
+    minWidth: 1200,
+    minHeight: 700,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+    title: 'Satin Alma Rapor Sistemi',
+    backgroundColor: '#f5f6f7',
+    show: false,
+  });
+
+  mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
+
+  // Pencere hazir oldugunda goster
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    mainWindow.maximize();
+  });
+
+  // Development modunda DevTools'u ac
+  if (process.argv.includes('--dev')) {
+    mainWindow.webContents.openDevTools();
+  }
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
+
+app.whenReady().then(() => {
+  createWindow();
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+// IPC Handlers
+ipcMain.handle('get-data', async (event, query) => {
+  try {
+    const result = await database.executeQuery(query);
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Database error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-all-data', async () => {
+  try {
+    const result = await database.getAllData();
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Database error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-dashboard-stats', async () => {
+  try {
+    const result = await database.getDashboardStats();
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Database error:', error);
+    return { success: false, error: error.message };
+  }
+});

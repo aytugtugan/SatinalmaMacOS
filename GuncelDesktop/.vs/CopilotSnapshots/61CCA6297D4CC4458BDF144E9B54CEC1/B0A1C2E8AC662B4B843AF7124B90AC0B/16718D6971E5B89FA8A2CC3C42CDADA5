@@ -1,0 +1,238 @@
+﻿const sql = require('mssql');
+
+const config = {
+  server: '10.35.20.15\\SQLSRV',
+  database: 'SNCG',
+  user: 'ozgur.copkur',
+  password: 'Oz2025!!',
+  options: {
+    encrypt: false,
+    trustServerCertificate: true,
+    enableArithAbort: true,
+  },
+  pool: {
+    max: 10,
+    min: 0,
+    idleTimeoutMillis: 30000,
+  },
+};
+
+let pool = null;
+
+async function getConnection() {
+  if (!pool) {
+    pool = await sql.connect(config);
+  }
+  return pool;
+}
+
+async function executeQuery(query) {
+  const connection = await getConnection();
+  const result = await connection.request().query(query);
+  return result.recordset;
+}
+
+async function getAllData() {
+  const query = `SELECT * FROM YLZ_TALEP_SIPARIS`;
+  return await executeQuery(query);
+}
+
+async function getDashboardStats() {
+  const connection = await getConnection();
+  
+  // Özet istatistikler
+  const summaryQuery = `
+    SELECT 
+      COUNT(DISTINCT [TALEP NUMARASI]) as totalTalep,
+      COUNT(DISTINCT [SİPARİŞ NUMARASI]) as totalSiparis,
+      COUNT(DISTINCT CASE WHEN [TESLİM TARİHİ] IS NOT NULL THEN [SİPARİŞ NUMARASI] END) as totalTeslimat,
+      COUNT(DISTINCT [CARİ ÜNVANI]) as totalTedarikci,
+      ISNULL(SUM([TOPLAM]), 0) as toplamTutar,
+      ISNULL(AVG([TOPLAM]), 0) as ortalamaTutar
+    FROM YLZ_TALEP_SIPARIS
+  `;
+  
+  // Aylık sipariş trendi
+  const monthlyTrendQuery = `
+    SELECT 
+      FORMAT([SİPARİŞ TARİHİ], 'yyyy-MM') as ay,
+      COUNT(DISTINCT [SİPARİŞ NUMARASI]) as siparisAdedi,
+      ISNULL(SUM([TOPLAM]), 0) as toplamTutar
+    FROM YLZ_TALEP_SIPARIS
+    WHERE [SİPARİŞ TARİHİ] IS NOT NULL
+    GROUP BY FORMAT([SİPARİŞ TARİHİ], 'yyyy-MM')
+    ORDER BY ay DESC
+  `;
+  
+  // Talep eden kişilere göre dağılım
+  const talepEdenQuery = `
+    SELECT TOP 10
+      [TALEP EDEN] as talepEden,
+      COUNT(*) as talepAdedi,
+      ISNULL(SUM([TOPLAM]), 0) as toplamTutar
+    FROM YLZ_TALEP_SIPARIS
+    WHERE [TALEP EDEN] IS NOT NULL AND [TALEP EDEN] != ''
+    GROUP BY [TALEP EDEN]
+    ORDER BY talepAdedi DESC
+  `;
+  
+  // Masraf merkezine göre dağılım
+  const masrafMerkeziQuery = `
+    SELECT TOP 10
+      [MASRAF MERKEZİ] as masrafMerkezi,
+      COUNT(*) as kayitAdedi,
+      ISNULL(SUM([TOPLAM]), 0) as toplamTutar
+    FROM YLZ_TALEP_SIPARIS
+    WHERE [MASRAF MERKEZİ] IS NOT NULL AND [MASRAF MERKEZİ] != ''
+    GROUP BY [MASRAF MERKEZİ]
+    ORDER BY toplamTutar DESC
+  `;
+  
+  // Tedarikçilere göre dağılım
+  const tedarikciQuery = `
+    SELECT TOP 10
+      [CARİ ÜNVANI] as tedarikci,
+      COUNT(DISTINCT [SİPARİŞ NUMARASI]) as siparisAdedi,
+      ISNULL(SUM([TOPLAM]), 0) as toplamTutar
+    FROM YLZ_TALEP_SIPARIS
+    WHERE [CARİ ÜNVANI] IS NOT NULL AND [CARİ ÜNVANI] != ''
+    GROUP BY [CARİ ÜNVANI]
+    ORDER BY toplamTutar DESC
+  `;
+  
+  // Para birimine göre dağılım
+  const paraBirimiQuery = `
+    SELECT 
+      ISNULL([PARA BİRİMİ], 'TRY') as paraBirimi,
+      COUNT(*) as kayitAdedi,
+      ISNULL(SUM([TOPLAM]), 0) as toplamTutar
+    FROM YLZ_TALEP_SIPARIS
+    GROUP BY [PARA BİRİMİ]
+    ORDER BY toplamTutar DESC
+  `;
+  
+  // Türe göre dağılım (Malzeme/Hizmet)
+  const turQuery = `
+    SELECT 
+      ISNULL([TÜR], 'Belirsiz') as tur,
+      COUNT(*) as kayitAdedi,
+      ISNULL(SUM([TOPLAM]), 0) as toplamTutar
+    FROM YLZ_TALEP_SIPARIS
+    GROUP BY [TÜR]
+    ORDER BY kayitAdedi DESC
+  `;
+  
+  // Sipariş durumu (Talep, Sipariş, Teslimat)
+  const durumQuery = `
+    SELECT 
+      CASE 
+        WHEN [TESLİM TARİHİ] IS NOT NULL THEN 'Teslim Edildi'
+        WHEN [SİPARİŞ TARİHİ] IS NOT NULL THEN 'Siparişte'
+        WHEN [TALEP TARİHİ] IS NOT NULL THEN 'Talepte'
+        ELSE 'Belirsiz'
+      END as durum,
+      COUNT(*) as kayitAdedi,
+      ISNULL(SUM([TOPLAM]), 0) as toplamTutar
+    FROM YLZ_TALEP_SIPARIS
+    GROUP BY 
+      CASE 
+        WHEN [TESLİM TARİHİ] IS NOT NULL THEN 'Teslim Edildi'
+        WHEN [SİPARİŞ TARİHİ] IS NOT NULL THEN 'Siparişte'
+        WHEN [TALEP TARİHİ] IS NOT NULL THEN 'Talepte'
+        ELSE 'Belirsiz'
+      END
+  `;
+  
+  // İş yerine göre dağılım
+  const isyeriQuery = `
+    SELECT 
+      ISNULL([İŞ YERİ], 'Belirsiz') as isyeri,
+      COUNT(*) as kayitAdedi,
+      ISNULL(SUM([TOPLAM]), 0) as toplamTutar
+    FROM YLZ_TALEP_SIPARIS
+    GROUP BY [İŞ YERİ]
+    ORDER BY toplamTutar DESC
+  `;
+  
+  // Sipariş onaylayan kişilere göre
+  const onaylayanQuery = `
+    SELECT TOP 10
+      [SİPARİŞ ONAYLAYAN] as onaylayan,
+      COUNT(DISTINCT [SİPARİŞ NUMARASI]) as siparisAdedi,
+      ISNULL(SUM([TOPLAM]), 0) as toplamTutar
+    FROM YLZ_TALEP_SIPARIS
+    WHERE [SİPARİŞ ONAYLAYAN] IS NOT NULL AND [SİPARİŞ ONAYLAYAN] != ''
+    GROUP BY [SİPARİŞ ONAYLAYAN]
+    ORDER BY siparisAdedi DESC
+  `;
+  
+  // Ödeme vadesine göre dağılım
+  const odemeVadesiQuery = `
+    SELECT 
+      ISNULL([ÖDEME VADESİ], 'Belirsiz') as odemeVadesi,
+      COUNT(*) as kayitAdedi,
+      ISNULL(SUM([TOPLAM]), 0) as toplamTutar
+    FROM YLZ_TALEP_SIPARIS
+    GROUP BY [ÖDEME VADESİ]
+    ORDER BY kayitAdedi DESC
+  `;
+
+  // Teslimat performansı - ortalama teslimat süresi
+  const teslimatSuresiQuery = `
+    SELECT 
+      AVG(DATEDIFF(DAY, [SİPARİŞ TARİHİ], [TESLİM TARİHİ])) as ortalamaTeslimatSuresi,
+      MIN(DATEDIFF(DAY, [SİPARİŞ TARİHİ], [TESLİM TARİHİ])) as minTeslimatSuresi,
+      MAX(DATEDIFF(DAY, [SİPARİŞ TARİHİ], [TESLİM TARİHİ])) as maxTeslimatSuresi
+    FROM YLZ_TALEP_SIPARIS
+    WHERE [SİPARİŞ TARİHİ] IS NOT NULL AND [TESLİM TARİHİ] IS NOT NULL
+  `;
+
+  const [
+    summary,
+    monthlyTrend,
+    talepEden,
+    masrafMerkezi,
+    tedarikci,
+    paraBirimi,
+    tur,
+    durum,
+    isyeri,
+    onaylayan,
+    odemeVadesi,
+    teslimatSuresi
+  ] = await Promise.all([
+    connection.request().query(summaryQuery),
+    connection.request().query(monthlyTrendQuery),
+    connection.request().query(talepEdenQuery),
+    connection.request().query(masrafMerkeziQuery),
+    connection.request().query(tedarikciQuery),
+    connection.request().query(paraBirimiQuery),
+    connection.request().query(turQuery),
+    connection.request().query(durumQuery),
+    connection.request().query(isyeriQuery),
+    connection.request().query(onaylayanQuery),
+    connection.request().query(odemeVadesiQuery),
+    connection.request().query(teslimatSuresiQuery)
+  ]);
+
+  return {
+    summary: summary.recordset[0],
+    monthlyTrend: monthlyTrend.recordset,
+    talepEden: talepEden.recordset,
+    masrafMerkezi: masrafMerkezi.recordset,
+    tedarikci: tedarikci.recordset,
+    paraBirimi: paraBirimi.recordset,
+    tur: tur.recordset,
+    durum: durum.recordset,
+    isyeri: isyeri.recordset,
+    onaylayan: onaylayan.recordset,
+    odemeVadesi: odemeVadesi.recordset,
+    teslimatSuresi: teslimatSuresi.recordset[0]
+  };
+}
+
+module.exports = {
+  executeQuery,
+  getAllData,
+  getDashboardStats,
+};

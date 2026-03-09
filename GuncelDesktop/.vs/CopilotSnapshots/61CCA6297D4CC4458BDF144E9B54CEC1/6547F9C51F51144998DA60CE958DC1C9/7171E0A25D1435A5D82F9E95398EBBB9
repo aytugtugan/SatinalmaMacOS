@@ -1,0 +1,116 @@
+﻿import React from 'react';
+import { SwitchableChart, formatNumber, formatCurrency } from '../components/SwitchableChart';
+import {
+  UserOutlined,
+  BankOutlined,
+  RiseOutlined,
+} from '@ant-design/icons';
+
+const TalepAnaliz = ({ data }) => {
+  if (!data) return null;
+
+  const { talepEden, masrafMerkezi, summary } = data;
+
+  // Talep eden kisilere gore
+  const talepEdenAdetData = (talepEden || []).map(item => ({
+    name: item.talepEden?.substring(0, 15) || 'Belirsiz',
+    value: item.talepAdedi,
+  }));
+
+  // Talep eden tutar grafigi icin
+  const talepEdenTutarData = (talepEden || []).map(item => ({
+    name: item.talepEden?.substring(0, 15) || 'Belirsiz',
+    value: item.toplamTutar,
+  }));
+
+  // Masraf merkezi adet grafigi icin
+  const masrafMerkeziAdetData = (masrafMerkezi || []).map(item => ({
+    name: item.masrafMerkezi?.substring(0, 20) || 'Belirsiz',
+    value: item.kayitAdedi,
+  }));
+
+  // Masraf merkezi tutar grafigi icin
+  const masrafMerkeziTutarData = (masrafMerkezi || []).map(item => ({
+    name: item.masrafMerkezi?.substring(0, 20) || 'Belirsiz',
+    value: item.toplamTutar,
+  }));
+
+  return (
+    <div>
+      <div className="page-header">
+        <h2>Talep Analizi</h2>
+        <p>Talep sureclerinin detayli analizi ve performans metrikleri</p>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="kpi-grid">
+        <div className="kpi-card">
+          <div className="kpi-icon blue">
+            <UserOutlined />
+          </div>
+          <div className="kpi-value">{talepEden?.length || 0}</div>
+          <div className="kpi-label">Talep Eden Kisi Sayisi</div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon green">
+            <BankOutlined />
+          </div>
+          <div className="kpi-value">{masrafMerkezi?.length || 0}</div>
+          <div className="kpi-label">Masraf Merkezi Sayisi</div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon orange">
+            <RiseOutlined />
+          </div>
+          <div className="kpi-value">{formatNumber(summary?.totalTalep || 0)}</div>
+          <div className="kpi-label">Toplam Talep</div>
+        </div>
+      </div>
+
+      {/* Charts */}
+      <div className="charts-grid">
+        <SwitchableChart
+          title="Talep Eden Kisilere Gore Talep Adedi"
+          data={talepEdenAdetData}
+          dataKey="value"
+          nameKey="name"
+          defaultType="bar"
+          height={320}
+        />
+
+        <SwitchableChart
+          title="Talep Eden Kisilere Gore Tutar"
+          data={talepEdenTutarData}
+          dataKey="value"
+          nameKey="name"
+          defaultType="horizontal"
+          valueFormatter={formatCurrency}
+          height={320}
+        />
+
+        <SwitchableChart
+          title="Masraf Merkezine Gore Kayit Adedi"
+          data={masrafMerkeziAdetData}
+          dataKey="value"
+          nameKey="name"
+          defaultType="pie"
+          height={320}
+        />
+
+        <SwitchableChart
+          title="Masraf Merkezine Gore Tutar"
+          data={masrafMerkeziTutarData}
+          dataKey="value"
+          nameKey="name"
+          defaultType="bar"
+          valueFormatter={formatCurrency}
+          height={320}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default TalepAnaliz;

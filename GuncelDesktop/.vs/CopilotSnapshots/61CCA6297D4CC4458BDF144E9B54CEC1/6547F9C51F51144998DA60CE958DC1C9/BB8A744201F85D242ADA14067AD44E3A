@@ -1,0 +1,145 @@
+﻿import React from 'react';
+import { SwitchableChart, formatNumber, formatCurrency } from '../components/SwitchableChart';
+import {
+  DollarOutlined,
+  GlobalOutlined,
+  FieldTimeOutlined,
+  BankOutlined,
+} from '@ant-design/icons';
+
+const FinansalAnaliz = ({ data }) => {
+  if (!data) return null;
+
+  const { paraBirimi, odemeVadesi, summary, monthlyTrend } = data;
+
+  // Para birimine gore dagilim
+  const paraBirimiData = (paraBirimi || []).map(item => ({
+    name: item.paraBirimi || 'TRY',
+    value: item.toplamTutar,
+    adet: item.kayitAdedi,
+  }));
+
+  // Para birimine gore adet
+  const paraBirimiAdetData = (paraBirimi || []).map(item => ({
+    name: item.paraBirimi || 'TRY',
+    value: item.kayitAdedi,
+  }));
+
+  // Odeme vadesine gore dagilim
+  const odemeVadesiData = (odemeVadesi || []).filter(item => item.odemeVadesi && item.odemeVadesi !== 'Belirsiz').map(item => ({
+    name: item.odemeVadesi,
+    value: item.kayitAdedi,
+  }));
+
+  // Odeme vadesine gore tutar
+  const odemeVadesiTutarData = (odemeVadesi || []).filter(item => item.odemeVadesi && item.odemeVadesi !== 'Belirsiz').map(item => ({
+    name: item.odemeVadesi,
+    value: item.toplamTutar,
+  }));
+
+  // Aylik harcama trendi
+  const aylikHarcamaData = (monthlyTrend || []).slice(0, 12).reverse().map(item => ({
+    name: item.ay,
+    value: item.toplamTutar,
+  }));
+
+  // Ortalama siparis tutari
+  const ortalamaTutar = summary?.ortalamaTutar || 0;
+
+  return (
+    <div>
+      <div className="page-header">
+        <h2>Finansal Analiz</h2>
+        <p>Harcama ve odeme analizleri, butce takibi</p>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="kpi-grid">
+        <div className="kpi-card">
+          <div className="kpi-icon blue">
+            <DollarOutlined />
+          </div>
+          <div className="kpi-value">{formatCurrency(summary?.toplamTutar || 0)}</div>
+          <div className="kpi-label">Toplam Harcama</div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon green">
+            <BankOutlined />
+          </div>
+          <div className="kpi-value">{formatCurrency(ortalamaTutar)}</div>
+          <div className="kpi-label">Ortalama Siparis Tutari</div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon orange">
+            <GlobalOutlined />
+          </div>
+          <div className="kpi-value">{paraBirimi?.length || 0}</div>
+          <div className="kpi-label">Para Birimi Cesidi</div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon purple">
+            <FieldTimeOutlined />
+          </div>
+          <div className="kpi-value">{odemeVadesi?.length || 0}</div>
+          <div className="kpi-label">Odeme Vadesi Cesidi</div>
+        </div>
+      </div>
+
+      {/* Charts */}
+      <div className="charts-grid">
+        <SwitchableChart
+          title="Aylik Harcama Trendi"
+          data={aylikHarcamaData}
+          dataKey="value"
+          nameKey="name"
+          defaultType="area"
+          valueFormatter={formatCurrency}
+          height={320}
+        />
+
+        <SwitchableChart
+          title="Para Birimine Gore Tutar Dagilimi"
+          data={paraBirimiData}
+          dataKey="value"
+          nameKey="name"
+          defaultType="pie"
+          valueFormatter={formatCurrency}
+          height={320}
+        />
+
+        <SwitchableChart
+          title="Para Birimine Gore Islem Adedi"
+          data={paraBirimiAdetData}
+          dataKey="value"
+          nameKey="name"
+          defaultType="bar"
+          height={320}
+        />
+
+        <SwitchableChart
+          title="Odeme Vadesine Gore Islem Adedi"
+          data={odemeVadesiData}
+          dataKey="value"
+          nameKey="name"
+          defaultType="horizontal"
+          height={320}
+        />
+
+        <SwitchableChart
+          title="Odeme Vadesine Gore Tutar"
+          data={odemeVadesiTutarData}
+          dataKey="value"
+          nameKey="name"
+          defaultType="bar"
+          valueFormatter={formatCurrency}
+          height={320}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default FinansalAnaliz;

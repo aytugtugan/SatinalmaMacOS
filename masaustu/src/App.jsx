@@ -22,6 +22,17 @@ const App = () => {
   const [selectedAmbar, setSelectedAmbar] = useState('all');
   const [comparisonData, setComparisonData] = useState({});
   const [isFullscreen, setIsFullscreen] = useState(true);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+
+  // Güncelleme event listener
+  useEffect(() => {
+    if (window.api?.onUpdateAvailable) {
+      window.api.onUpdateAvailable(() => setUpdateAvailable(true));
+    }
+    if (window.api?.onUpdateDownloaded) {
+      window.api.onUpdateDownloaded(() => setUpdateAvailable(false));
+    }
+  }, []);
 
   // Ambar listesini yukle
   const loadAmbarList = async () => {
@@ -209,7 +220,7 @@ const App = () => {
                   <ReloadOutlined spin={loading} />
                   <span>Yenile</span>
                 </button>
-                <div className="notification-badge" title="Yeni güncelleme mevcut"></div>
+{updateAvailable && <div className="notification-badge" title="Yeni güncelleme mevcut"></div>}
                 <div className="win-controls">
                   <button className="win-btn win-minimize" onClick={handleMinimize} title="Küçült">
                     <MinusOutlined />

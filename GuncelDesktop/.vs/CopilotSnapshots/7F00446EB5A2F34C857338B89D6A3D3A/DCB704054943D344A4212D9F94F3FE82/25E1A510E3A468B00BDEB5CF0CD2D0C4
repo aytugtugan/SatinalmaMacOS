@@ -1,0 +1,241 @@
+﻿const sql = require('mssql');
+
+const config = {
+  server: '10.35.20.15\\SQLSRV',
+  database: 'SNCG',
+  user: 'ozgur.copkur',
+  password: 'Oz2025!!',
+  options: {
+    encrypt: false,
+    trustServerCertificate: true,
+    enableArithAbort: true,
+  },
+  pool: {
+    max: 10,
+    min: 0,
+    idleTimeoutMillis: 30000,
+  },
+};
+
+let pool = null;
+let columnCache = null;
+
+async function getConnection() {
+  if (!pool) {
+    pool = await sql.connect(config);
+  }
+  return pool;
+}
+
+async function getColumnNames() {
+  if (columnCache) return columnCache;
+  const conn = await getConnection();
+  const result = await conn.request().query(
+    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'YLZ_TALEP_SIPARIS' ORDER BY ORDINAL_POSITION"
+  );
+  const cols = result.recordset.map(r => r.COLUMN_NAME);
+  console.log('All columns from DB:', cols);
+
+  // Do NOT include square brackets in the stored column names. q(...) will add brackets when building queries.
+  const id = (s) => String(s || '');
+
+  // Exact Turkish column fallbacks from user-provided table
+  const FALLBACKS = {
+    TALEP_NO: 'TALEP NUMARASI',
+    SIPARIS_NO: 'SİPARİŞ NUMARASI',
+    TESLIM_TARIHI: 'TESLİM TARİHİ',
+    TESLIM_EVRAK_NO: 'TESLİM EVRAK NO',
+    CARI_UNVANI: 'CARİ ÜNVANI',
+    TOPLAM: 'TOPLAM',
+    SIPARIS_TARIHI: 'SİPARİŞ TARİHİ',
+    TALEP_EDEN: 'TALEP EDEN',
+    MASRAF_MERKEZI: 'MASRAF MERKEZİ',
+    PARA_BIRIMI: 'PARA BİRİMİ',
+    TUR: 'TÜR',
+    TALEP_TARIHI: 'TALEP TARİHİ',
+    ISYERI: 'İŞ YERİ',
+    SIPARIS_ONAYLAYAN: 'SİPARİŞ ONAYLAYAN',
+    ODEME_VADESI: 'ÖDEME VADESİ',
+    BIRIM_FIYAT: 'BİRİM FİYAT',
+    MIKTAR: 'MİKTAR',
+    SIPARIS_MALZEME: 'SİPARİŞ MALZEME',
+    BIRIM: 'BİRİM',
+    FIRMA_NO: 'FİRMA NUMARASI',
+    FIRMA_ADI: 'FİRMA ADI',
+    AMBAR: 'AMBAR',
+    MALZEME_KODU: 'MALZEME/HİZMET KODU',
+    TALEP_ONAYLAYAN: 'TALEP ONAYLAYAN',
+    TALEP_ONAY_TARIHI: 'TALEP ONAY TARİHİ',
+    TALEP_ACIKLAMA: 'TALEP AÇIKLAMA',
+    SIPARISI_ACAN: 'SİPARİŞİ AÇAN',
+    SIPARIS_ONAY_TARIHI: 'SİPARİŞ ONAY TARİHİ',
+    TESLIM_ALAN: 'TESLİM ALAN',
+    ACIKLAMA: 'AÇIKLAMA',
+    FATURAYI_KAYDEDEN: 'FATURAYI KAYDEDEN',
+    FATURA_KAYDETME_TARIHI: 'FATURA KAYDETME TARİHİ',
+    FATURA_TARIHI: 'FATURA TARİHİ',
+    FATURA_NO: 'FATURA NO'
+  };
+
+  // pick actual column if present else use Turkish fallback
+  const pick = (candidates) => {
+    for (const cand of candidates) {
+      const found = cols.find(x => x && x.toUpperCase() === cand.toUpperCase());
+      if (found) return found;
+    }
+    // fallback by key name if exact column missing
+    return null;
+  };
+
+  columnCache = {
+    FIRMA_NO: id(pick(['FİRMA NUMARASI']) || FALLBACKS.FIRMA_NO),
+    FIRMA_ADI: id(pick(['FİRMA ADI']) || FALLBACKS.FIRMA_ADI),
+    ISYERI: id(pick(['İŞ YERİ','ISYERI']) || FALLBACKS.ISYERI),
+    AMBAR: id(pick(['AMBAR']) || FALLBACKS.AMBAR),
+    TUR: id(pick(['TÜR','TUR']) || FALLBACKS.TUR),
+    MALZEME_KODU: id(pick(['MALZEME/HİZMET KODU']) || FALLBACKS.MALZEME_KODU),
+    MASRAF_MERKEZI: id(pick(['MASRAF MERKEZİ','MASRAF MERKEZI']) || FALLBACKS.MASRAF_MERKEZI),
+    TALEP_NO: id(pick(['TALEP NUMARASI']) || FALLBACKS.TALEP_NO),
+    TALEP_EDEN: id(pick(['TALEP EDEN']) || FALLBACKS.TALEP_EDEN),
+    TALEP_TARIHI: id(pick(['TALEP TARİHİ']) || FALLBACKS.TALEP_TARIHI),
+    TALEP_ONAYLAYAN: id(pick(['TALEP ONAYLAYAN']) || FALLBACKS.TALEP_ONAYLAYAN),
+    TALEP_ONAY_TARIHI: id(pick(['TALEP ONAY TARİHİ']) || FALLBACKS.TALEP_ONAY_TARIHI),
+    TALEP_ACIKLAMA: id(pick(['TALEP AÇIKLAMA']) || FALLBACKS.TALEP_ACIKLAMA),
+    SIPARIS_NO: id(pick(['SİPARİŞ NUMARASI','SIPARIS NUMARASI']) || FALLBACKS.SIPARIS_NO),
+    SIPARISI_ACAN: id(pick(['SİPARİŞİ AÇAN','SIPARISI ACAN']) || FALLBACKS.SIPARISI_ACAN),
+    SIPARIS_TARIHI: id(pick(['SİPARİŞ TARİHİ']) || FALLBACKS.SIPARIS_TARIHI),
+    SIPARIS_ONAYLAYAN: id(pick(['SİPARİŞ ONAYLAYAN']) || FALLBACKS.SIPARIS_ONAYLAYAN),
+    SIPARIS_ONAY_TARIHI: id(pick(['SİPARİŞ ONAY TARİHİ']) || FALLBACKS.SIPARIS_ONAY_TARIHI),
+    SIPARIS_MALZEME: id(pick(['SİPARİŞ MALZEME']) || FALLBACKS.SIPARIS_MALZEME),
+    TESLIM_EVRAK_NO: id(pick(['TESLİM EVRAK NO']) || FALLBACKS.TESLIM_EVRAK_NO),
+    TESLIM_TARIHI: id(pick(['TESLİM TARİHİ']) || FALLBACKS.TESLIM_TARIHI),
+    CARI_UNVANI: id(pick(['CARİ ÜNVANI','CARI UNVANI']) || FALLBACKS.CARI_UNVANI),
+    TESLIM_ALAN: id(pick(['TESLİM ALAN']) || FALLBACKS.TESLIM_ALAN),
+    ACIKLAMA: id(pick(['AÇIKLAMA']) || FALLBACKS.ACIKLAMA),
+    MIKTAR: id(pick(['MİKTAR','MIKTAR']) || FALLBACKS.MIKTAR),
+    BIRIM: id(pick(['BİRİM','BIRIM']) || FALLBACKS.BIRIM),
+    ODEME_VADESI: id(pick(['ÖDEME VADESİ','ODEME VADESI']) || FALLBACKS.ODEME_VADESI),
+    PARA_BIRIMI: id(pick(['PARA BİRİMİ','PARA BIRIMI']) || FALLBACKS.PARA_BIRIMI),
+    BIRIM_FIYAT: id(pick(['BİRİM FİYAT','BIRIM FİYAT']) || FALLBACKS.BIRIM_FIYAT),
+    TOPLAM: id(pick(['TOPLAM','TOPLAM_TUTAR','TUTAR']) || FALLBACKS.TOPLAM),
+    FATURAYI_KAYDEDEN: id(pick(['FATURAYI KAYDEDEN']) || FALLBACKS.FATURAYI_KAYDEDEN),
+    FATURA_KAYDETME_TARIHI: id(pick(['FATURA KAYDETME TARİHİ']) || FALLBACKS.FATURA_KAYDETME_TARIHI),
+    FATURA_TARIHI: id(pick(['FATURA TARİHİ']) || FALLBACKS.FATURA_TARIHI),
+    FATURA_NO: id(pick(['FATURA NO']) || FALLBACKS.FATURA_NO)
+  };
+  console.log('Column mapping:', columnCache);
+  return columnCache;
+}
+
+// Export column names for frontend
+async function getColumnMapping() {
+  return await getColumnNames();
+}
+
+async function executeQuery(query) {
+  const conn = await getConnection();
+  const result = await conn.request().query(query);
+  return result.recordset;
+}
+
+async function getAllData() {
+  const cols = await getColumnNames();
+  const data = await executeQuery('SELECT * FROM YLZ_TALEP_SIPARIS');
+  return { data, columns: cols };
+}
+
+// Isyeri listesini getir
+async function getIsyeriList() {
+  const C = await getColumnNames();
+  const q = (col) => '[' + col + ']';
+  const query = "SELECT DISTINCT " + q(C.ISYERI) + " as isyeri FROM YLZ_TALEP_SIPARIS WHERE " + q(C.ISYERI) + " IS NOT NULL AND " + q(C.ISYERI) + " != '' ORDER BY " + q(C.ISYERI);
+  return await executeQuery(query);
+}
+
+// Isyeri filtresine gore istatistikler
+async function getDashboardStats(isyeriFilter) {
+  const conn = await getConnection();
+  const C = await getColumnNames();
+  const q = (col) => '[' + col + ']';
+  
+  // Isyeri filtresi
+  const whereClause = isyeriFilter && isyeriFilter !== 'all' 
+    ? " WHERE " + q(C.ISYERI) + " = '" + isyeriFilter.replace(/'/g, "''") + "'" 
+    : "";
+  const andClause = isyeriFilter && isyeriFilter !== 'all' 
+    ? " AND " + q(C.ISYERI) + " = '" + isyeriFilter.replace(/'/g, "''") + "'" 
+    : "";
+
+  // Summary - Tekil siparis sayisi ve toplam tutar
+  const summaryQuery = "SELECT COUNT(DISTINCT " + q(C.TALEP_NO) + ") as totalTalep, COUNT(DISTINCT " + q(C.SIPARIS_NO) + ") as totalSiparis, COUNT(DISTINCT CASE WHEN " + q(C.TESLIM_EVRAK_NO) + " IS NOT NULL AND " + q(C.TESLIM_EVRAK_NO) + " != '' THEN " + q(C.SIPARIS_NO) + " END) as totalTeslimat, COUNT(DISTINCT CASE WHEN " + q(C.TESLIM_EVRAK_NO) + " IS NULL OR " + q(C.TESLIM_EVRAK_NO) + " = '' THEN " + q(C.SIPARIS_NO) + " END) as bekleyenTeslimat, COUNT(DISTINCT " + q(C.CARI_UNVANI) + ") as totalTedarikci, COUNT(DISTINCT " + q(C.TALEP_EDEN) + ") as totalTalepEden FROM YLZ_TALEP_SIPARIS" + whereClause;
+
+  // Toplam siparis tutari - Tekrar eden siparisler icin gruplu
+  const toplamTutarQuery = "SELECT ISNULL(SUM(t.toplamTutar), 0) as toplamTutar, ISNULL(AVG(t.toplamTutar), 0) as ortalamaTutar FROM (SELECT " + q(C.SIPARIS_NO) + ", SUM(" + q(C.TOPLAM) + ") as toplamTutar FROM YLZ_TALEP_SIPARIS" + whereClause + (whereClause ? " AND " : " WHERE ") + q(C.SIPARIS_NO) + " IS NOT NULL GROUP BY " + q(C.SIPARIS_NO) + ") t";
+
+  // Aylik trend
+  const monthlyTrendQuery = "SELECT FORMAT(" + q(C.SIPARIS_TARIHI) + ", 'yyyy-MM') as ay, COUNT(DISTINCT " + q(C.SIPARIS_NO) + ") as siparisAdedi, ISNULL(SUM(" + q(C.TOPLAM) + "), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS WHERE " + q(C.SIPARIS_TARIHI) + " IS NOT NULL" + andClause + " GROUP BY FORMAT(" + q(C.SIPARIS_TARIHI) + ", 'yyyy-MM') ORDER BY ay DESC";
+
+  // Talep eden
+  const talepEdenQuery = "SELECT TOP 10 " + q(C.TALEP_EDEN) + " as talepEden, COUNT(DISTINCT " + q(C.SIPARIS_NO) + ") as siparisAdedi, COUNT(*) as talepAdedi, ISNULL(SUM(" + q(C.TOPLAM) + "), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS WHERE " + q(C.TALEP_EDEN) + " IS NOT NULL AND " + q(C.TALEP_EDEN) + " != ''" + andClause + " GROUP BY " + q(C.TALEP_EDEN) + " ORDER BY toplamTutar DESC";
+
+  // Masraf merkezi
+  const masrafMerkeziQuery = "SELECT TOP 10 " + q(C.MASRAF_MERKEZI) + " as masrafMerkezi, COUNT(DISTINCT " + q(C.SIPARIS_NO) + ") as siparisAdedi, ISNULL(SUM(" + q(C.TOPLAM) + "), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS WHERE " + q(C.MASRAF_MERKEZI) + " IS NOT NULL AND " + q(C.MASRAF_MERKEZI) + " != ''" + andClause + " GROUP BY " + q(C.MASRAF_MERKEZI) + " ORDER BY toplamTutar DESC";
+
+  // Tedarikci
+  const tedarikciQuery = "SELECT TOP 10 " + q(C.CARI_UNVANI) + " as tedarikci, COUNT(DISTINCT " + q(C.SIPARIS_NO) + ") as siparisAdedi, ISNULL(SUM(" + q(C.TOPLAM) + "), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS WHERE " + q(C.CARI_UNVANI) + " IS NOT NULL AND " + q(C.CARI_UNVANI) + " != ''" + andClause + " GROUP BY " + q(C.CARI_UNVANI) + " ORDER BY toplamTutar DESC";
+
+  // Para birimi
+  const paraBirimiQuery = "SELECT ISNULL(" + q(C.PARA_BIRIMI) + ", 'TRY') as paraBirimi, COUNT(DISTINCT " + q(C.SIPARIS_NO) + ") as siparisAdedi, COUNT(*) as kayitAdedi, ISNULL(SUM(" + q(C.TOPLAM) + "), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS" + whereClause + " GROUP BY " + q(C.PARA_BIRIMI) + " ORDER BY toplamTutar DESC";
+
+  // Tur
+  const turQuery = "SELECT ISNULL(" + q(C.TUR) + ", 'Belirsiz') as tur, COUNT(DISTINCT " + q(C.SIPARIS_NO) + ") as siparisAdedi, COUNT(*) as kayitAdedi, ISNULL(SUM(" + q(C.TOPLAM) + "), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS" + whereClause + " GROUP BY " + q(C.TUR) + " ORDER BY kayitAdedi DESC";
+
+  // Teslim durumu
+  const teslimDurumQuery = "SELECT CASE WHEN " + q(C.TESLIM_EVRAK_NO) + " IS NOT NULL AND " + q(C.TESLIM_EVRAK_NO) + " != '' THEN 'Teslim Edildi' ELSE 'Teslim Bekliyor' END as durum, COUNT(DISTINCT " + q(C.SIPARIS_NO) + ") as siparisAdedi, COUNT(*) as kayitAdedi, ISNULL(SUM(" + q(C.TOPLAM) + "), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS" + whereClause + " GROUP BY CASE WHEN " + q(C.TESLIM_EVRAK_NO) + " IS NOT NULL AND " + q(C.TESLIM_EVRAK_NO) + " != '' THEN 'Teslim Edildi' ELSE 'Teslim Bekliyor' END";
+
+  // Isyeri dagilimi
+  const isyeriQuery = "SELECT ISNULL(" + q(C.ISYERI) + ", 'Belirsiz') as isyeri, COUNT(DISTINCT " + q(C.SIPARIS_NO) + ") as siparisAdedi, COUNT(*) as kayitAdedi, ISNULL(SUM(" + q(C.TOPLAM) + "), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS GROUP BY " + q(C.ISYERI) + " ORDER BY toplamTutar DESC";
+
+  // Onaylayan
+  const onaylayanQuery = "SELECT TOP 10 " + q(C.SIPARIS_ONAYLAYAN) + " as onaylayan, COUNT(DISTINCT " + q(C.SIPARIS_NO) + ") as siparisAdedi, ISNULL(SUM(" + q(C.TOPLAM) + "), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS WHERE " + q(C.SIPARIS_ONAYLAYAN) + " IS NOT NULL AND " + q(C.SIPARIS_ONAYLAYAN) + " != ''" + andClause + " GROUP BY " + q(C.SIPARIS_ONAYLAYAN) + " ORDER BY siparisAdedi DESC";
+
+  // Odeme vadesi
+  const odemeVadesiQuery = "SELECT ISNULL(" + q(C.ODEME_VADESI) + ", 'Belirsiz') as odemeVadesi, COUNT(DISTINCT " + q(C.SIPARIS_NO) + ") as siparisAdedi, COUNT(*) as kayitAdedi, ISNULL(SUM(" + q(C.TOPLAM) + "), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS" + whereClause + " GROUP BY " + q(C.ODEME_VADESI) + " ORDER BY toplamTutar DESC";
+
+  // Teslimat suresi
+  const teslimatSuresiQuery = "SELECT AVG(DATEDIFF(DAY, " + q(C.SIPARIS_TARIHI) + ", " + q(C.TESLIM_TARIHI) + ")) as ortalamaTeslimatSuresi, MIN(DATEDIFF(DAY, " + q(C.SIPARIS_TARIHI) + ", " + q(C.TESLIM_TARIHI) + ")) as minTeslimatSuresi, MAX(DATEDIFF(DAY, " + q(C.SIPARIS_TARIHI) + ", " + q(C.TESLIM_TARIHI) + ")) as maxTeslimatSuresi FROM YLZ_TALEP_SIPARIS WHERE " + q(C.SIPARIS_TARIHI) + " IS NOT NULL AND " + q(C.TESLIM_TARIHI) + " IS NOT NULL" + andClause;
+
+  const [summary, toplamTutar, monthlyTrend, talepEden, masrafMerkezi, tedarikci, paraBirimi, tur, teslimDurum, isyeri, onaylayan, odemeVadesi, teslimatSuresi] = await Promise.all([
+    conn.request().query(summaryQuery),
+    conn.request().query(toplamTutarQuery),
+    conn.request().query(monthlyTrendQuery),
+    conn.request().query(talepEdenQuery),
+    conn.request().query(masrafMerkeziQuery),
+    conn.request().query(tedarikciQuery),
+    conn.request().query(paraBirimiQuery),
+    conn.request().query(turQuery),
+    conn.request().query(teslimDurumQuery),
+    conn.request().query(isyeriQuery),
+    conn.request().query(onaylayanQuery),
+    conn.request().query(odemeVadesiQuery),
+    conn.request().query(teslimatSuresiQuery)
+  ]);
+
+  return {
+    summary: { ...summary.recordset[0], ...toplamTutar.recordset[0] },
+    monthlyTrend: monthlyTrend.recordset,
+    talepEden: talepEden.recordset,
+    masrafMerkezi: masrafMerkezi.recordset,
+    tedarikci: tedarikci.recordset,
+    paraBirimi: paraBirimi.recordset,
+    tur: tur.recordset,
+    durum: teslimDurum.recordset,
+    isyeri: isyeri.recordset,
+    onaylayan: onaylayan.recordset,
+    odemeVadesi: odemeVadesi.recordset,
+    teslimatSuresi: teslimatSuresi.recordset[0],
+    columns: C
+  };
+}
+
+module.exports = { executeQuery, getAllData, getDashboardStats, getIsyeriList, getColumnMapping };

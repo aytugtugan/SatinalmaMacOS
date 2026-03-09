@@ -1,0 +1,314 @@
+﻿const sql = require('mssql');
+
+const config = {
+  server: '10.35.20.15\\SQLSRV',
+  database: 'SNCG',
+  user: 'ozgur.copkur',
+  password: 'Oz2025!!',
+  options: {
+    encrypt: false,
+    trustServerCertificate: true,
+    enableArithAbort: true,
+  },
+  pool: {
+    max: 10,
+    min: 0,
+    idleTimeoutMillis: 30000,
+  },
+};
+
+// Kolon isimleri - kose parantez ile birlikte (SQL sorguları için)
+const C = {
+  FIRMA_NO: '[FIRMA NUMARASI]',
+  FIRMA_ADI: '[FIRMA ADI]',
+  ISYERI: '[İŞ YERİ]',
+  AMBAR: '[AMBAR]',
+  TUR: '[TÜR]',
+  MALZEME_KODU: '[MALZEME/HİZMET KODU]',
+  MASRAF_MERKEZI: '[MASRAF MERKEZİ]',
+  TALEP_NO: '[TALEP NUMARASI]',
+  TALEP_EDEN: '[TALEP EDEN]',
+  TALEP_TARIHI: '[TALEP TARİHİ]',
+  TALEP_ONAYLAYAN: '[TALEP ONAYLAYAN]',
+  TALEP_ONAY_TARIHI: '[TALEP ONAY TARİHİ]',
+  TALEP_ACIKLAMA: '[TALEP AÇIKLAMA]',
+  SIPARIS_NO: '[SİPARİŞ NUMARASI]',
+  SIPARISI_ACAN: '[SİPARİŞİ AÇAN]',
+  SIPARIS_TARIHI: '[SİPARİŞ TARİHİ]',
+  SIPARIS_ONAYLAYAN: '[SİPARİŞ ONAYLAYAN]',
+  SIPARIS_ONAY_TARIHI: '[SİPARİŞ ONAY TARİHİ]',
+  SIPARIS_MALZEME: '[SİPARİŞ MALZEME]',
+  TESLIM_EVRAK_NO: '[TESLİM EVRAK NO]',
+  TESLIM_TARIHI: '[TESLİM TARİHİ]',
+  CARI_UNVANI: '[CARİ UNVANI]',
+  TESLIM_ALAN: '[TESLİM ALAN]',
+  ACIKLAMA: '[AÇIKLAMA]',
+  MIKTAR: '[MIKTAR]',
+  BIRIM: '[BİRİM]',
+  ODEME_VADESI: '[ÖDEME VADESİ]',
+  PARA_BIRIMI: '[PARA BİRİMİ]',
+  BIRIM_FIYAT: '[BİRİM FİYAT]',
+  TOPLAM: '[TOPLAM]',
+  FATURAYI_KAYDEDEN: '[FATURAYI KAYDEDEN]',
+  FATURA_KAYDETME_TARIHI: '[FATURA KAYDETME TARİHİ]',
+  FATURA_TARIHI: '[FATURA TARİHİ]',
+  FATURA_NO: '[FATURA NO]'
+};
+
+// 2026 yili baslangic tarihi
+const DATE_FILTER = "2026-01-01";
+
+let pool = null;
+
+// rate cache
+let _rateCache = { ts: 0, data: null };
+const RATE_TTL_MS = 0; // always fetch latest as requested
+
+async function getConnection() {
+  if (!pool) {
+    pool = await sql.connect(config);
+  }
+  return pool;
+}
+
+async function fetchLatestRates() {
+  const now = Date.now();
+  if (RATE_TTL_MS > 0 && _rateCache.data && (now - _rateCache.ts) < RATE_TTL_MS) return _rateCache.data;
+
+  const url = 'https://api.exchangerate.host/latest?base=TRY';
+  return new Promise((resolve, reject) => {
+    const https = require('https');
+    https.get(url, (res) => {
+      let raw = '';
+      res.on('data', (chunk) => raw += chunk);
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.rates) {
+            _rateCache = { ts: Date.now(), data: parsed.rates };
+            resolve(parsed.rates);
+          } else {
+            reject(new Error('Invalid rate response'));
+          }
+        } catch (e) { reject(e); }
+      });
+    }).on('error', (e) => reject(e));
+  });
+}
+
+function normalizeCurrencyKey(s) {
+  if (!s) return 'TRY';
+  let t = s.toString().trim().toUpperCase();
+  if (t === 'TL' || t === '₺' || t === 'TRY' || t === 'TUR') return 'TRY';
+  t = t.replace(/[^A-Z]/g, '');
+  return t || 'TRY';
+}
+
+async function executeQuery(query) {
+  const connection = await getConnection();
+  const result = await connection.request().query(query);
+  return result.recordset;
+}
+
+// Build SELECT list that aliases DB columns to machine-friendly keys
+function buildSelectFields() {
+  return Object.keys(C).map(key => `${C[key]} AS ${key}`).join(', ');
+}
+
+// Frontend columns mapping: machine keys -> machine keys (used as dataIndex)
+const MACHINE_COLUMNS = {};
+Object.keys(C).forEach(k => { MACHINE_COLUMNS[k] = k; });
+
+async function getAllData() {
+  const selectFields = buildSelectFields();
+  const query = `SELECT ${selectFields} FROM YLZ_TALEP_SIPARIS WHERE ${C.TALEP_TARIHI} >= '${DATE_FILTER}' OR ${C.SIPARIS_TARIHI} >= '${DATE_FILTER}'`;
+  const data = await executeQuery(query);
+  return { data, columns: MACHINE_COLUMNS };
+}
+
+async function getAmbarList() {
+  const query = `SELECT DISTINCT ${C.AMBAR} as ambar FROM YLZ_TALEP_SIPARIS WHERE ${C.AMBAR} IS NOT NULL AND ${C.AMBAR} != '' AND (${C.TALEP_TARIHI} >= '${DATE_FILTER}' OR ${C.SIPARIS_TARIHI} >= '${DATE_FILTER}') ORDER BY ${C.AMBAR}`;
+  return await executeQuery(query);
+}
+
+// compute converted total to TRY by grouping sums per currency and applying live rates
+async function computeTotalInTRY(whereClause = '') {
+  const groupQuery = `SELECT ISNULL(${C.PARA_BIRIMI}, 'TRY') as paraBirimi, ISNULL(SUM(${C.TOPLAM}),0) as toplam FROM YLZ_TALEP_SIPARIS ${whereClause} GROUP BY ${C.PARA_BIRIMI}`;
+  const groups = await executeQuery(groupQuery);
+  const rates = await fetchLatestRates();
+  let totalTRY = 0;
+  for (const g of groups) {
+    const para = normalizeCurrencyKey(g.paraBirimi);
+    const amount = Number(g.toplam) || 0;
+    if (para === 'TRY') { totalTRY += amount; continue; }
+    const rateForCur = rates[para];
+    if (!rateForCur || rateForCur === 0) continue;
+    const factor = 1 / rateForCur;
+    totalTRY += amount * factor;
+  }
+  return totalTRY;
+}
+
+async function convertGroupedQuery(fieldExpr, aliasName, whereClause = '') {
+  // returns array of objects { [aliasName]: value, toplamTutar: convertedTRY, siparisAdedi, kayitAdedi }
+  const groupQuery = `SELECT ${fieldExpr} as grp, ISNULL(${C.PARA_BIRIMI}, 'TRY') as paraBirimi, ISNULL(SUM(${C.TOPLAM}),0) as toplam FROM YLZ_TALEP_SIPARIS ${whereClause} GROUP BY ${fieldExpr}, ${C.PARA_BIRIMI}`;
+  const rows = await executeQuery(groupQuery);
+  const rates = await fetchLatestRates();
+  const sumMap = new Map();
+  for (const r of rows) {
+    const grp = r.grp === null || r.grp === undefined ? 'Belirsiz' : r.grp;
+    const para = normalizeCurrencyKey(r.paraBirimi);
+    const amount = Number(r.toplam) || 0;
+    let converted = 0;
+    if (para === 'TRY') converted = amount;
+    else {
+      const rate = rates[para];
+      if (rate && rate !== 0) converted = amount * (1 / rate);
+      else converted = 0;
+    }
+    sumMap.set(grp, (sumMap.get(grp) || 0) + converted);
+  }
+
+  // get counts per group (distinct siparis and total records)
+  const countsQuery = `SELECT ${fieldExpr} as grp, COUNT(DISTINCT ${C.SIPARIS_NO}) as siparisAdedi, COUNT(*) as kayitAdedi FROM YLZ_TALEP_SIPARIS ${whereClause} GROUP BY ${fieldExpr}`;
+  const countsRows = await executeQuery(countsQuery);
+  const countsMap = new Map();
+  for (const c of countsRows) {
+    const grp = c.grp === null || c.grp === undefined ? 'Belirsiz' : c.grp;
+    countsMap.set(grp, { siparisAdedi: Number(c.siparisAdedi) || 0, talepAdedi: Number(c.kayitAdedi) || 0 });
+  }
+
+  const arr = Array.from(sumMap.entries()).map(([k,v]) => {
+    const counts = countsMap.get(k) || { siparisAdedi: 0, talepAdedi: 0 };
+    return { [aliasName]: k, toplamTutar: v, siparisAdedi: counts.siparisAdedi, talepAdedi: counts.talepAdedi };
+  });
+  arr.sort((a,b) => b.toplamTutar - a.toplamTutar);
+  return arr;
+}
+
+async function getDashboardStats(ambarFilter) {
+  const connection = await getConnection();
+  
+  // Tarih filtresi (2026 ve sonrasi)
+  const dateFilter = `(${C.TALEP_TARIHI} >= '${DATE_FILTER}' OR ${C.SIPARIS_TARIHI} >= '${DATE_FILTER}')`;
+  
+  // Ambar filtresi
+  const ambarCondition = ambarFilter && ambarFilter !== 'all' 
+    ? ` AND ${C.AMBAR} = N'${ambarFilter.replace(/'/g, "''")}'` 
+    : '';
+  
+  const whereClause = ` WHERE ${dateFilter}${ambarCondition}`;
+  const andClause = ` AND ${dateFilter}${ambarCondition}`;
+
+  // Summary
+  const summaryQuery = `SELECT COUNT(DISTINCT ${C.TALEP_NO}) as totalTalep, COUNT(DISTINCT ${C.SIPARIS_NO}) as totalSiparis, COUNT(DISTINCT CASE WHEN ${C.TESLIM_EVRAK_NO} IS NOT NULL AND ${C.TESLIM_EVRAK_NO} != '' THEN ${C.SIPARIS_NO} END) as totalTeslimat, COUNT(DISTINCT CASE WHEN ${C.TESLIM_EVRAK_NO} IS NULL OR ${C.TESLIM_EVRAK_NO} = '' THEN ${C.SIPARIS_NO} END) as bekleyenTeslimat, COUNT(DISTINCT ${C.CARI_UNVANI}) as totalTedarikci, COUNT(DISTINCT ${C.TALEP_EDEN}) as totalTalepEden FROM YLZ_TALEP_SIPARIS${whereClause}`;
+
+  // Toplam tutar (gruplu - orijinal, kept for compatibility)
+  const toplamTutarQuery = `SELECT ISNULL(SUM(t.toplamTutar), 0) as toplamTutar, ISNULL(AVG(t.toplamTutar), 0) as ortalamaTutar FROM (SELECT ${C.SIPARIS_NO}, SUM(${C.TOPLAM}) as toplamTutar FROM YLZ_TALEP_SIPARIS${whereClause} AND ${C.SIPARIS_NO} IS NOT NULL GROUP BY ${C.SIPARIS_NO}) t`;
+
+  // Original queries (kept for fallback)
+  const monthlyTrendQuery = `SELECT FORMAT(${C.SIPARIS_TARIHI}, 'yyyy-MM') as ay, COUNT(DISTINCT ${C.SIPARIS_NO}) as siparisAdedi, ISNULL(SUM(${C.TOPLAM}), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS WHERE ${C.SIPARIS_TARIHI} IS NOT NULL${andClause} GROUP BY FORMAT(${C.SIPARIS_TARIHI}, 'yyyy-MM') ORDER BY ay DESC`;
+  const talepEdenQuery = `SELECT TOP 10 ${C.TALEP_EDEN} as talepEden, COUNT(DISTINCT ${C.SIPARIS_NO}) as siparisAdedi, COUNT(*) as talepAdedi, ISNULL(SUM(${C.TOPLAM}), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS WHERE ${C.TALEP_EDEN} IS NOT NULL AND ${C.TALEP_EDEN} != ''${andClause} GROUP BY ${C.TALEP_EDEN} ORDER BY toplamTutar DESC`;
+  const masrafMerkeziQuery = `SELECT TOP 10 ${C.MASRAF_MERKEZI} as masrafMerkezi, COUNT(DISTINCT ${C.SIPARIS_NO}) as siparisAdedi, ISNULL(SUM(${C.TOPLAM}), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS WHERE ${C.MASRAF_MERKEZI} IS NOT NULL AND ${C.MASRAF_MERKEZI} != ''${andClause} GROUP BY ${C.MASRAF_MERKEZI} ORDER BY toplamTutar DESC`;
+  const tedarikciQuery = `SELECT TOP 10 ${C.CARI_UNVANI} as tedarikci, COUNT(DISTINCT ${C.SIPARIS_NO}) as siparisAdedi, ISNULL(SUM(${C.TOPLAM}), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS WHERE ${C.CARI_UNVANI} IS NOT NULL AND ${C.CARI_UNVANI} != ''${andClause} GROUP BY ${C.CARI_UNVANI} ORDER BY toplamTutar DESC`;
+  const paraBirimiQuery = `SELECT ISNULL(${C.PARA_BIRIMI}, 'TRY') as paraBirimi, COUNT(DISTINCT ${C.SIPARIS_NO}) as siparisAdedi, COUNT(*) as kayitAdedi, ISNULL(SUM(${C.TOPLAM}), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS${whereClause} GROUP BY ${C.PARA_BIRIMI} ORDER BY toplamTutar DESC`;
+  const turQuery = `SELECT ISNULL(${C.TUR}, 'Belirsiz') as tur, COUNT(DISTINCT ${C.SIPARIS_NO}) as siparisAdedi, COUNT(*) as kayitAdedi, ISNULL(SUM(${C.TOPLAM}), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS${whereClause} GROUP BY ${C.TUR} ORDER BY toplamTutar DESC`;
+  const teslimDurumQuery = `SELECT CASE WHEN ${C.TESLIM_EVRAK_NO} IS NOT NULL AND ${C.TESLIM_EVRAK_NO} != '' THEN 'Teslim Edildi' ELSE 'Teslim Bekliyor' END as durum, COUNT(DISTINCT ${C.SIPARIS_NO}) as siparisAdedi, COUNT(*) as kayitAdedi, ISNULL(SUM(${C.TOPLAM}), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS${whereClause} GROUP BY CASE WHEN ${C.TESLIM_EVRAK_NO} IS NOT NULL AND ${C.TESLIM_EVRAK_NO} != '' THEN 'Teslim Edildi' ELSE 'Teslim Bekliyor' END ORDER BY toplamTutar DESC`;
+  const ambarQuery = `SELECT ISNULL(${C.AMBAR}, 'Belirsiz') as ambar, COUNT(DISTINCT ${C.SIPARIS_NO}) as siparisAdedi, COUNT(*) as kayitAdedi, ISNULL(SUM(${C.TOPLAM}), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS${whereClause} GROUP BY ${C.AMBAR} ORDER BY toplamTutar DESC`;
+  const isyeriQuery = `SELECT ISNULL(${C.ISYERI}, 'Belirsiz') as isyeri, COUNT(DISTINCT ${C.SIPARIS_NO}) as siparisAdedi, COUNT(*) as kayitAdedi, ISNULL(SUM(${C.TOPLAM}), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS${whereClause} GROUP BY ${C.ISYERI} ORDER BY toplamTutar DESC`;
+  const onaylayanQuery = `SELECT TOP 10 ${C.SIPARIS_ONAYLAYAN} as onaylayan, COUNT(DISTINCT ${C.SIPARIS_NO}) as siparisAdedi, ISNULL(SUM(${C.TOPLAM}), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS WHERE ${C.SIPARIS_ONAYLAYAN} IS NOT NULL AND ${C.SIPARIS_ONAYLAYAN} != ''${andClause} GROUP BY ${C.SIPARIS_ONAYLAYAN} ORDER BY toplamTutar DESC`;
+  const odemeVadesiQuery = `SELECT ISNULL(${C.ODEME_VADESI}, 'Belirsiz') as odemeVadesi, COUNT(DISTINCT ${C.SIPARIS_NO}) as siparisAdedi, COUNT(*) as kayitAdedi, ISNULL(SUM(${C.TOPLAM}), 0) as toplamTutar FROM YLZ_TALEP_SIPARIS${whereClause} GROUP BY ${C.ODEME_VADESI} ORDER BY toplamTutar DESC`;
+  const teslimatSuresiQuery = `SELECT AVG(DATEDIFF(DAY, ${C.SIPARIS_TARIHI}, ${C.TESLIM_TARIHI})) as ortalamaTeslimatSuresi, MIN(DATEDIFF(DAY, ${C.SIPARIS_TARIHI}, ${C.TESLIM_TARIHI})) as minTeslimatSuresi, MAX(DATEDIFF(DAY, ${C.SIPARIS_TARIHI}, ${C.TESLIM_TARIHI})) as maxTeslimatSuresi FROM YLZ_TALEP_SIPARIS WHERE ${C.SIPARIS_TARIHI} IS NOT NULL AND ${C.TESLIM_TARIHI} IS NOT NULL${andClause}`;
+
+  const [summary, toplamTutar, monthlyTrendRaw, talepEdenRaw, masrafMerkeziRaw, tedarikciRaw, paraBirimiRaw, turRaw, teslimDurumRaw, ambarRaw, isyeriRaw, onaylayanRaw, odemeVadesiRaw, teslimatSuresi] = await Promise.all([
+    connection.request().query(summaryQuery),
+    connection.request().query(toplamTutarQuery),
+    connection.request().query(monthlyTrendQuery),
+    connection.request().query(talepEdenQuery),
+    connection.request().query(masrafMerkeziQuery),
+    connection.request().query(tedarikciQuery),
+    connection.request().query(paraBirimiQuery),
+    connection.request().query(turQuery),
+    connection.request().query(teslimDurumQuery),
+    connection.request().query(ambarQuery),
+    connection.request().query(isyeriQuery),
+    connection.request().query(onaylayanQuery),
+    connection.request().query(odemeVadesiQuery),
+    connection.request().query(teslimatSuresiQuery)
+  ]);
+
+  // compute live-converted total to TRY (uses whereClause constructed above)
+  let toplamTutarTRY = 0;
+  try {
+    toplamTutarTRY = await computeTotalInTRY(whereClause);
+  } catch (e) {
+    console.error('Error computing TRY total:', e);
+    toplamTutarTRY = 0;
+  }
+
+  // Convert grouped datasets to TRY using live rates
+  let monthlyTrend = [];
+  try {
+    const monthWhere = ` WHERE ${C.SIPARIS_TARIHI} IS NOT NULL${andClause}`;
+    // get converted totals per month
+    const months = await convertGroupedQuery(`FORMAT(${C.SIPARIS_TARIHI}, 'yyyy-MM')`, 'ay', monthWhere);
+    // fetch siparisAdedi per month separately
+    const countsQuery = `SELECT FORMAT(${C.SIPARIS_TARIHI}, 'yyyy-MM') as ay, COUNT(DISTINCT ${C.SIPARIS_NO}) as siparisAdedi FROM YLZ_TALEP_SIPARIS ${monthWhere} GROUP BY FORMAT(${C.SIPARIS_TARIHI}, 'yyyy-MM')`;
+    const counts = await executeQuery(countsQuery);
+    const countsMap = new Map(counts.map(r => [r.ay, r.siparisAdedi]));
+    monthlyTrend = months.map(m => ({ ay: m.ay, siparisAdedi: countsMap.get(m.ay) || 0, toplamTutar: m.toplamTutar }));
+  } catch (e) {
+    console.error('monthlyTrend conversion error:', e);
+    monthlyTrend = monthlyTrendRaw.recordset;
+  }
+
+  // helper to convert other groupings
+  async function convertAndFallback(fieldExpr, alias, rawRecordset) {
+    try {
+      const arr = await convertGroupedQuery(fieldExpr, alias, whereClause);
+      // ensure shape similar to original DB recordset: include alias, toplamTutar, siparisAdedi, talepAdedi
+      return arr.map(r => ({ [alias]: r[alias], toplamTutar: r.toplamTutar, siparisAdedi: r.siparisAdedi, talepAdedi: r.talepAdedi }));
+    } catch (e) {
+      console.error('convert grouping error for', alias, e);
+      return rawRecordset.recordset;
+    }
+  }
+
+  const talepEden = await convertAndFallback(C.TALEP_EDEN, 'talepEden', talepEdenRaw);
+  const masrafMerkezi = await convertAndFallback(C.MASRAF_MERKEZI, 'masrafMerkezi', masrafMerkeziRaw);
+  const tedarikci = await convertAndFallback(C.CARI_UNVANI, 'tedarikci', tedarikciRaw);
+  const ambar = await convertAndFallback(C.AMBAR, 'ambar', ambarRaw);
+  const isyeri = await convertAndFallback(C.ISYERI, 'isyeri', isyeriRaw);
+  const onaylayan = await convertAndFallback(C.SIPARIS_ONAYLAYAN, 'onaylayan', onaylayanRaw);
+  const odemeVadesi = await convertAndFallback(C.ODEME_VADESI, 'odemeVadesi', odemeVadesiRaw);
+  const teslimDurum = await convertAndFallback(`CASE WHEN ${C.TESLIM_EVRAK_NO} IS NOT NULL AND ${C.TESLIM_EVRAK_NO} != '' THEN 'Teslim Edildi' ELSE 'Teslim Bekliyor' END`, 'durum', teslimDurumRaw);
+
+  // paraBirimiConverted - per-currency converted totals
+  let paraBirimiConverted = [];
+  try {
+    const perCur = await convertGroupedQuery(`${C.PARA_BIRIMI}`, 'paraBirimi', whereClause);
+    paraBirimiConverted = perCur.map(p => ({ paraBirimi: p.paraBirimi || 'TRY', toplam: p.toplamTutar, convertedTRY: p.toplamTutar }));
+  } catch (e) {
+    console.error('paraBirimiConverted error:', e);
+    paraBirimiConverted = paraBirimiRaw.recordset;
+  }
+
+  return {
+    summary: { ...summary.recordset[0], ...toplamTutar.recordset[0], toplamTutarTRY },
+    monthlyTrend,
+    talepEden,
+    masrafMerkezi,
+    tedarikci,
+    paraBirimi: paraBirimiRaw.recordset,
+    paraBirimiConverted,
+    tur: turRaw.recordset,
+    durum: teslimDurum,
+    ambar,
+    onaylayan,
+    odemeVadesi,
+    teslimatSuresi: teslimatSuresi.recordset[0],
+    columns: MACHINE_COLUMNS
+  };
+}
+
+module.exports = { executeQuery, getAllData, getDashboardStats, getAmbarList, COLUMNS: MACHINE_COLUMNS };

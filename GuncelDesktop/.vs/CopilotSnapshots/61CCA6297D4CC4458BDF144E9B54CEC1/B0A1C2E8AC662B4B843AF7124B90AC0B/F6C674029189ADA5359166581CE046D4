@@ -1,0 +1,269 @@
+﻿import React, { useState, useMemo } from 'react';
+import { Table, Input, DatePicker, Select, Button, Space, Tag, Tooltip } from 'antd';
+import { SearchOutlined, ReloadOutlined, DownloadOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
+
+const { RangePicker } = DatePicker;
+
+const DetayliRapor = ({ data }) => {
+  const [searchText, setSearchText] = useState('');
+  const [dateRange, setDateRange] = useState(null);
+  const [selectedDurum, setSelectedDurum] = useState(null);
+  const [pageSize, setPageSize] = useState(20);
+
+  // Tablo kolonları
+  const columns = [
+    {
+      title: 'Talep No',
+      dataIndex: 'TALEP NUMARASI',
+      key: 'talepNo',
+      width: 120,
+      fixed: 'left',
+      sorter: (a, b) => (a['TALEP NUMARASI'] || '').localeCompare(b['TALEP NUMARASI'] || ''),
+    },
+    {
+      title: 'Sipariş No',
+      dataIndex: 'SİPARİŞ NUMARASI',
+      key: 'siparisNo',
+      width: 120,
+      sorter: (a, b) => (a['SİPARİŞ NUMARASI'] || '').localeCompare(b['SİPARİŞ NUMARASI'] || ''),
+    },
+    {
+      title: 'Talep Eden',
+      dataIndex: 'TALEP EDEN',
+      key: 'talepEden',
+      width: 150,
+      ellipsis: true,
+    },
+    {
+      title: 'Talep Tarihi',
+      dataIndex: 'TALEP TARİHİ',
+      key: 'talepTarihi',
+      width: 110,
+      render: (date) => date ? dayjs(date).format('DD.MM.YYYY') : '-',
+      sorter: (a, b) => new Date(a['TALEP TARİHİ']) - new Date(b['TALEP TARİHİ']),
+    },
+    {
+      title: 'Sipariş Tarihi',
+      dataIndex: 'SİPARİŞ TARİHİ',
+      key: 'siparisTarihi',
+      width: 110,
+      render: (date) => date ? dayjs(date).format('DD.MM.YYYY') : '-',
+      sorter: (a, b) => new Date(a['SİPARİŞ TARİHİ']) - new Date(b['SİPARİŞ TARİHİ']),
+    },
+    {
+      title: 'Teslim Tarihi',
+      dataIndex: 'TESLİM TARİHİ',
+      key: 'teslimTarihi',
+      width: 110,
+      render: (date) => date ? dayjs(date).format('DD.MM.YYYY') : '-',
+    },
+    {
+      title: 'Cari Ünvanı',
+      dataIndex: 'CARİ ÜNVANI',
+      key: 'cariUnvani',
+      width: 200,
+      ellipsis: {
+        showTitle: false,
+      },
+      render: (text) => (
+        <Tooltip placement="topLeft" title={text}>
+          {text || '-'}
+        </Tooltip>
+      ),
+    },
+    {
+      title: 'Malzeme/Hizmet',
+      dataIndex: 'SİPARİŞ MALZEME',
+      key: 'malzeme',
+      width: 200,
+      ellipsis: {
+        showTitle: false,
+      },
+      render: (text) => (
+        <Tooltip placement="topLeft" title={text}>
+          {text || '-'}
+        </Tooltip>
+      ),
+    },
+    {
+      title: 'Miktar',
+      dataIndex: 'MİKTAR',
+      key: 'miktar',
+      width: 80,
+      align: 'right',
+      render: (val) => val?.toLocaleString('tr-TR') || '-',
+    },
+    {
+      title: 'Birim',
+      dataIndex: 'BİRİM',
+      key: 'birim',
+      width: 70,
+    },
+    {
+      title: 'Birim Fiyat',
+      dataIndex: 'BİRİM FİYAT',
+      key: 'birimFiyat',
+      width: 110,
+      align: 'right',
+      render: (val) => val ? `₺${val.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}` : '-',
+    },
+    {
+      title: 'Toplam',
+      dataIndex: 'TOPLAM',
+      key: 'toplam',
+      width: 120,
+      align: 'right',
+      fixed: 'right',
+      render: (val) => val ? `₺${val.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}` : '-',
+      sorter: (a, b) => (a['TOPLAM'] || 0) - (b['TOPLAM'] || 0),
+    },
+    {
+      title: 'Durum',
+      key: 'durum',
+      width: 110,
+      fixed: 'right',
+      render: (_, record) => {
+        if (record['TESLİM TARİHİ']) {
+          return <Tag color="green">Teslim Edildi</Tag>;
+        } else if (record['SİPARİŞ TARİHİ']) {
+          return <Tag color="blue">Siparişte</Tag>;
+        } else if (record['TALEP TARİHİ']) {
+          return <Tag color="orange">Talepte</Tag>;
+        }
+        return <Tag color="default">Belirsiz</Tag>;
+      },
+      filters: [
+        { text: 'Teslim Edildi', value: 'teslim' },
+        { text: 'Siparişte', value: 'siparis' },
+        { text: 'Talepte', value: 'talep' },
+      ],
+      onFilter: (value, record) => {
+        if (value === 'teslim') return !!record['TESLİM TARİHİ'];
+        if (value === 'siparis') return !record['TESLİM TARİHİ'] && !!record['SİPARİŞ TARİHİ'];
+        if (value === 'talep') return !record['SİPARİŞ TARİHİ'] && !!record['TALEP TARİHİ'];
+        return true;
+      },
+    },
+  ];
+
+  // Filtreleme
+  const filteredData = useMemo(() => {
+    let result = data || [];
+
+    // Metin araması
+    if (searchText) {
+      const search = searchText.toLowerCase();
+      result = result.filter(item =>
+        (item['TALEP NUMARASI'] || '').toLowerCase().includes(search) ||
+        (item['SİPARİŞ NUMARASI'] || '').toLowerCase().includes(search) ||
+        (item['TALEP EDEN'] || '').toLowerCase().includes(search) ||
+        (item['CARİ ÜNVANI'] || '').toLowerCase().includes(search) ||
+        (item['SİPARİŞ MALZEME'] || '').toLowerCase().includes(search)
+      );
+    }
+
+    // Tarih aralığı filtresi
+    if (dateRange && dateRange[0] && dateRange[1]) {
+      const startDate = dateRange[0].startOf('day');
+      const endDate = dateRange[1].endOf('day');
+      result = result.filter(item => {
+        const itemDate = dayjs(item['SİPARİŞ TARİHİ']);
+        return itemDate.isValid() && itemDate.isAfter(startDate) && itemDate.isBefore(endDate);
+      });
+    }
+
+    return result;
+  }, [data, searchText, dateRange]);
+
+  // Excel export
+  const handleExport = () => {
+    const csvContent = [
+      columns.map(col => col.title).join(';'),
+      ...filteredData.map(row =>
+        columns.map(col => {
+          const value = row[col.dataIndex];
+          if (col.dataIndex?.includes('TARİH') && value) {
+            return dayjs(value).format('DD.MM.YYYY');
+          }
+          return value || '';
+        }).join(';')
+      )
+    ].join('\n');
+
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `satinalma_rapor_${dayjs().format('YYYYMMDD_HHmmss')}.csv`;
+    link.click();
+  };
+
+  // Özet bilgiler
+  const toplamTutar = filteredData.reduce((sum, item) => sum + (item['TOPLAM'] || 0), 0);
+  const teslimEdilen = filteredData.filter(item => item['TESLİM TARİHİ']).length;
+  const sipariste = filteredData.filter(item => !item['TESLİM TARİHİ'] && item['SİPARİŞ TARİHİ']).length;
+
+  return (
+    <div>
+      <div className="page-header">
+        <h2>📋 Detaylı Rapor</h2>
+        <p>Tüm satın alma kayıtlarının detaylı listesi</p>
+      </div>
+
+      {/* Filters */}
+      <div className="data-table-container" style={{ marginBottom: 20, padding: 20 }}>
+        <Space wrap size="middle">
+          <Input
+            placeholder="Ara... (Talep No, Sipariş No, Tedarikçi)"
+            prefix={<SearchOutlined />}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            style={{ width: 300 }}
+            allowClear
+          />
+          <RangePicker
+            placeholder={['Başlangıç', 'Bitiş']}
+            onChange={setDateRange}
+            format="DD.MM.YYYY"
+          />
+          <Button icon={<ReloadOutlined />} onClick={() => { setSearchText(''); setDateRange(null); }}>
+            Sıfırla
+          </Button>
+          <Button type="primary" icon={<DownloadOutlined />} onClick={handleExport}>
+            Excel İndir
+          </Button>
+        </Space>
+
+        {/* Summary */}
+        <div style={{ marginTop: 16, display: 'flex', gap: 24 }}>
+          <span><strong>Toplam Kayıt:</strong> {filteredData.length.toLocaleString('tr-TR')}</span>
+          <span><strong>Toplam Tutar:</strong> ₺{toplamTutar.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+          <span><strong>Teslim Edilen:</strong> <Tag color="green">{teslimEdilen}</Tag></span>
+          <span><strong>Siparişte:</strong> <Tag color="blue">{sipariste}</Tag></span>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="data-table-container">
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          rowKey={(record, index) => `${record['TALEP NUMARASI']}_${record['SİPARİŞ NUMARASI']}_${index}`}
+          scroll={{ x: 1800, y: 500 }}
+          pagination={{
+            pageSize: pageSize,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total) => `Toplam ${total} kayıt`,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            onShowSizeChange: (_, size) => setPageSize(size),
+          }}
+          size="small"
+          bordered
+        />
+      </div>
+    </div>
+  );
+};
+
+export default DetayliRapor;
