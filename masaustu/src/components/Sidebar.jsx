@@ -8,7 +8,12 @@ import {
   DatabaseOutlined,
 } from '@ant-design/icons';
 
-import logoImgInline from '../../assets/logo.jpg?inline';
+let logoImgInline;
+try {
+  logoImgInline = require('../../assets/logo.jpg?inline').default || '';
+} catch {
+  logoImgInline = '';
+}
 
 const menuItems = [
   { key: 'dashboard', icon: <AppstoreOutlined />, label: 'Dashboard' },
@@ -24,7 +29,7 @@ const Sidebar = ({ currentPage, setCurrentPage }) => {
     <aside className="sidebar">
       <div className="sidebar-header">
         <div className="logo-icon">
-          <img src={logoImgInline} alt="logo" className="logo-img" />
+          {logoImgInline ? <img src={logoImgInline} alt="logo" className="logo-img" /> : <DatabaseOutlined style={{ fontSize: '32px', color: '#1890ff' }} />}
         </div>
         <div className="logo-text">
           <h1>Satın Alma</h1>

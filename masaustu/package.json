@@ -19,7 +19,6 @@
     "forceCodeSigning": false,
     "win": {
       "target": "nsis",
-      "icon": "assets\\icon.ico",
       "signAndEditExecutable": false
     },
     "nsis": {
@@ -28,8 +27,6 @@
       "allowElevation": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico",
       "shortcutName": "Satin Alma Rapor"
     },
     "publish": [
