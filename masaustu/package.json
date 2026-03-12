@@ -1,6 +1,6 @@
 {
   "name": "satinalma-rapor",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "Satın Alma Rapor Uygulaması",
   "main": "main.js",
   "scripts": {
@@ -27,11 +27,12 @@
       "oneClick": true,
       "perMachine": false,
       "allowElevation": true,
-      "createDesktopShortcut": true,
+      "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
       "shortcutName": "Satin Alma Rapor",
       "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico"
+      "uninstallerIcon": "assets/icon.ico",
+      "runAfterFinish": true
     },
     "publish": [
       {

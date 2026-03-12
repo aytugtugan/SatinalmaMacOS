@@ -4,15 +4,6 @@ import {
   Bar,
   PieChart,
   Pie,
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  RadarChart,
-  Radar,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -24,9 +15,6 @@ import {
 import {
   BarChartOutlined,
   PieChartOutlined,
-  LineChartOutlined,
-  AreaChartOutlined,
-  RadarChartOutlined,
   MenuOutlined,
   InboxOutlined,
 } from '@ant-design/icons';
@@ -48,9 +36,6 @@ const COLORS = [
 const CHART_TYPES = [
   { key: 'bar', icon: <BarChartOutlined />, label: 'Cubuk Grafik' },
   { key: 'pie', icon: <PieChartOutlined />, label: 'Pasta Grafik' },
-  { key: 'line', icon: <LineChartOutlined />, label: 'Cizgi Grafik' },
-  { key: 'area', icon: <AreaChartOutlined />, label: 'Alan Grafik' },
-  { key: 'radar', icon: <RadarChartOutlined />, label: 'Radar Grafik' },
   { key: 'horizontal', icon: <MenuOutlined />, label: 'Yatay Cubuk' },
 ];
 
@@ -212,9 +197,18 @@ const SwitchableChart = ({
   const effectiveHeight = expanded ? Math.max(400, (data?.length || 0) * 34) : height;
 
   // safe sorted copy (descending by numeric value of dataKey) when sort enabled
-  const sortedData = Array.isArray(data)
+  const allSorted = Array.isArray(data)
     ? (sort ? [...data].sort((a, b) => toNumber(b[dataKey]) - toNumber(a[dataKey])) : [...data])
     : [];
+
+  // Pasta grafik için top 10 + Diğer; diğer grafikler için tüm veri
+  const sortedData = (() => {
+    if (effectiveType !== 'pie' || allSorted.length <= 10) return allSorted;
+    const top10 = allSorted.slice(0, 10);
+    const rest = allSorted.slice(10);
+    const otherVal = rest.reduce((s, d) => s + (toNumber(d[dataKey]) || 0), 0);
+    return [...top10, { [nameKey]: 'Diğer (' + rest.length + ')', [dataKey]: otherVal }];
+  })();
 
   const renderChart = () => {
     if (!sortedData || sortedData.length === 0) {
@@ -248,11 +242,11 @@ const SwitchableChart = ({
                 nameKey={nameKey}
                 cx="50%"
                 cy="50%"
-                outerRadius={90}
-                innerRadius={50}
-                paddingAngle={0}
+                outerRadius={100}
+                innerRadius={0}
+                paddingAngle={1}
                 label={({ name, percent }) =>
-                  percent > 0.04 ? `${name ? name.substring(0, 10) : ''} ${(percent * 100).toFixed(0)}%` : ''
+                  percent > 0.04 ? `${name ? name.substring(0, 12) : ''} ${(percent * 100).toFixed(0)}%` : ''
                 }
                 labelLine={true}
               >
@@ -260,111 +254,14 @@ const SwitchableChart = ({
                   <Cell
                     key={`cell-${index}`}
                     fill={COLORS[index % COLORS.length]}
-                    stroke="none"
-                    strokeWidth={0}
+                    stroke="#fff"
+                    strokeWidth={1}
                   />
                 ))}
               </Pie>
               <Tooltip content={<CustomTooltip valueFormatter={formatter} />} />
               <Legend content={<CustomLegend />} />
             </PieChart>
-          </ResponsiveContainer>
-        );
-
-      case 'line':
-        return (
-          <ResponsiveContainer width="100%" height={effectiveHeight}>
-            <LineChart data={sortedData} margin={{ top: 20, right: 30, left: 10, bottom: 60 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-              <XAxis 
-                dataKey={nameKey} 
-                tick={{ fontSize: 11, fill: '#6a6d70', fontFamily: "'72', 'Segoe UI', sans-serif" }} 
-                angle={-45} 
-                textAnchor="end"
-                height={70}
-                axisLine={{ stroke: '#f1f5f9' }}
-                tickLine={false}
-              />
-              <YAxis 
-                tickFormatter={formatter} 
-                tick={{ fontSize: 11, fill: '#6a6d70', fontFamily: "'72', 'Segoe UI', sans-serif" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip content={<CustomTooltip valueFormatter={formatter} />} />
-              <Line
-                type="monotone"
-                dataKey={dataKey}
-                stroke="#0a6ed1"
-                strokeWidth={2.5}
-                dot={{ fill: '#3b82f6', strokeWidth: 0, r: 4 }}
-                activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        );
-
-      case 'area':
-        return (
-          <ResponsiveContainer width="100%" height={effectiveHeight}>
-            <AreaChart data={sortedData} margin={{ top: 20, right: 30, left: 10, bottom: 60 }}>
-              <defs>
-                <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#0a6ed1" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#0a6ed1" stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-              <XAxis 
-                dataKey={nameKey} 
-                tick={{ fontSize: 11, fill: '#6a6d70', fontFamily: "'72', 'Segoe UI', sans-serif" }} 
-                angle={-45} 
-                textAnchor="end"
-                height={70}
-                axisLine={{ stroke: '#f1f5f9' }}
-                tickLine={false}
-              />
-              <YAxis 
-                tickFormatter={formatter} 
-                tick={{ fontSize: 11, fill: '#6a6d70', fontFamily: "'72', 'Segoe UI', sans-serif" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip content={<CustomTooltip valueFormatter={formatter} />} />
-              <Area
-                type="monotone"
-                dataKey={dataKey}
-                stroke="#0a6ed1"
-                strokeWidth={2}
-                fill="url(#colorGradient)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        );
-
-      case 'radar':
-        return (
-          <ResponsiveContainer width="100%" height={effectiveHeight}>
-            <RadarChart data={sortedData} cx="50%" cy="50%" outerRadius={80}>
-              <PolarGrid stroke="#f1f5f9" />
-              <PolarAngleAxis 
-                dataKey={nameKey} 
-                tick={{ fontSize: 10, fill: '#6a6d70', fontFamily: "'72', 'Segoe UI', sans-serif" }} 
-              />
-              <PolarRadiusAxis 
-                tick={{ fontSize: 10, fill: '#6a6d70', fontFamily: "'72', 'Segoe UI', sans-serif" }}
-                axisLine={false}
-              />
-              <Radar
-                name={title}
-                dataKey={dataKey}
-                stroke="#0a6ed1"
-                fill="#0a6ed1"
-                fillOpacity={0.25}
-                strokeWidth={2}
-              />
-              <Tooltip content={<CustomTooltip valueFormatter={formatter} />} />
-            </RadarChart>
           </ResponsiveContainer>
         );
 

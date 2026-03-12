@@ -203,7 +203,23 @@ const IhaleYonetimi = ({ selectedAmbar = 'all' }) => {
       )
     : data;
 
-  const setField = (key, val) => setForm(f => ({ ...f, [key]: val }));
+  const setField = (key, val) => setForm(f => {
+    const updated = { ...f, [key]: val };
+    // Teklif veya firma değiştiğinde kazanan ve kazancı otomatik hesapla
+    if (key.startsWith('teklif_') || key.startsWith('firma_')) {
+      const teklifler = [1,2,3,4,5].map(i => ({
+        firma: updated[`firma_${i}`] || '',
+        teklif: parseFloat(updated[`teklif_${i}_tl`]) || 0,
+      })).filter(t => t.firma && t.teklif > 0);
+      if (teklifler.length > 0) {
+        const minTeklif = teklifler.reduce((min, t) => t.teklif < min.teklif ? t : min, teklifler[0]);
+        const maxTeklif = Math.max(...teklifler.map(t => t.teklif));
+        updated.kazanan_tedarikci = minTeklif.firma;
+        updated.kazanc_tutari_tl = (maxTeklif - minTeklif.teklif).toFixed(2);
+      }
+    }
+    return updated;
+  });
 
   return (
     <div className="ihale-page">
@@ -488,8 +504,8 @@ const IhaleYonetimi = ({ selectedAmbar = 'all' }) => {
                     </datalist>
                   </div>
                   <div className="ihale-form-field">
-                    <label>Kazanan Tedarikçi</label>
-                    <input type="text" value={form.kazanan_tedarikci} onChange={e => setField('kazanan_tedarikci', e.target.value)} placeholder="Kazanan firma" />
+                    <label>Kazanan Tedarikçi (otomatik)</label>
+                    <input type="text" value={form.kazanan_tedarikci} readOnly style={{ background: '#f8fafc', cursor: 'default' }} placeholder="En düşük teklif veren firma" />
                   </div>
                 </div>
               </div>
@@ -517,12 +533,12 @@ const IhaleYonetimi = ({ selectedAmbar = 'all' }) => {
 
               {/* Kazanç */}
               <div className="ihale-form-section">
-                <h4>Kazanç Bilgisi</h4>
+                <h4>Kazanç Bilgisi (otomatik hesaplanır)</h4>
                 <div className="ihale-form-grid">
                   <div className="ihale-form-field">
-                    <label>Kazanç Tutarı (TL)</label>
+                    <label>Kazanç Tutarı (en yüksek - en düşük teklif)</label>
                     <div className="input-currency lg">
-                      <input type="number" step="0.01" value={form.kazanc_tutari_tl} onChange={e => setField('kazanc_tutari_tl', e.target.value)} placeholder="0.00" />
+                      <input type="number" value={form.kazanc_tutari_tl} readOnly style={{ background: '#f8fafc', cursor: 'default' }} placeholder="0.00" />
                       <span className="currency-suffix">₺</span>
                     </div>
                   </div>

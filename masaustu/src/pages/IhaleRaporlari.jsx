@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  BarChart, Bar, PieChart, Pie, LineChart, Line,
+  BarChart, Bar, PieChart, Pie,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend,
 } from 'recharts';
 import {
-  TrophyOutlined, BarChartOutlined, PieChartFilled, LineChartOutlined,
+  TrophyOutlined, BarChartOutlined, PieChartFilled,
   LeftOutlined, RightOutlined,
   SwapOutlined, DollarOutlined, ThunderboltOutlined, CrownOutlined,
   FireOutlined, AimOutlined, ReloadOutlined,
@@ -48,7 +48,7 @@ const ChartTooltip = ({ active, payload, label, formatter }) => {
   );
 };
 
-const ChartSwitch = ({ mode, setMode, types = ['bar', 'pie', 'line'] }) => (
+const ChartSwitch = ({ mode, setMode, types = ['bar', 'pie'] }) => (
   <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', borderRadius: 8, padding: 3 }}>
     {types.includes('bar') && (
       <button onClick={() => setMode('bar')}
@@ -62,13 +62,6 @@ const ChartSwitch = ({ mode, setMode, types = ['bar', 'pie', 'line'] }) => (
         style={{ padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 14,
           background: mode === 'pie' ? '#3b82f6' : 'transparent', color: mode === 'pie' ? '#fff' : '#64748b' }}>
         <PieChartFilled />
-      </button>
-    )}
-    {types.includes('line') && (
-      <button onClick={() => setMode('line')}
-        style={{ padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 14,
-          background: mode === 'line' ? '#3b82f6' : 'transparent', color: mode === 'line' ? '#fff' : '#64748b' }}>
-        <LineChartOutlined />
       </button>
     )}
   </div>
@@ -128,26 +121,35 @@ const LegendTable = ({ headers, rows }) => (
 const RenderChart = ({ data, mode, dataKey, nameKey, height = 280 }) => {
   if (!data?.length) return <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>Veri bulunamadı</div>;
 
+  // Pasta grafik: top 10 + Diğer
+  const pieData = (() => {
+    if (mode !== 'pie' || data.length <= 10) return data;
+    const top10 = data.slice(0, 10);
+    const rest = data.slice(10);
+    const otherVal = rest.reduce((s, d) => s + (parseFloat(d[dataKey]) || 0), 0);
+    return [...top10, { [nameKey]: 'Diğer (' + rest.length + ')', [dataKey]: otherVal }];
+  })();
+
   if (mode === 'pie') {
-    const pieTotal = data.reduce((s, d) => s + (parseFloat(d[dataKey]) || 0), 0);
+    const pieTotal = pieData.reduce((s, d) => s + (parseFloat(d[dataKey]) || 0), 0);
     return (
       <>
         <ResponsiveContainer width="100%" height={height}>
           <PieChart>
-            <Pie data={data} dataKey={dataKey} nameKey={nameKey} cx="50%" cy="50%" outerRadius={90} innerRadius={50} paddingAngle={0}
+            <Pie data={pieData} dataKey={dataKey} nameKey={nameKey} cx="50%" cy="50%" outerRadius={100} innerRadius={0} paddingAngle={1}
               label={({ name, percent }) => percent > 0.04 ? `${name ? String(name).substring(0, 12) : ''} ${(percent * 100).toFixed(0)}%` : ''} labelLine={true}>
-              {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="none" strokeWidth={0} />)}
+              {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="#fff" strokeWidth={1} />)}
             </Pie>
             <Tooltip content={<ChartTooltip formatter={fmtShort} />} />
             <Legend />
           </PieChart>
         </ResponsiveContainer>
         <div style={{ fontSize: 12, padding: '4px 8px 8px', borderTop: '1px solid #f1f5f9', marginTop: 4 }}>
-          {data.map((item, i) => {
+          {pieData.map((item, i) => {
             const val = parseFloat(item[dataKey]) || 0;
             const pct = pieTotal > 0 ? (val / pieTotal) * 100 : 0;
             return (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: i < data.length - 1 ? '1px solid #f8fafc' : 'none' }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: i < pieData.length - 1 ? '1px solid #f8fafc' : 'none' }}>
                 <div style={{ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: COLORS[i % COLORS.length] }} />
                 <span style={{ flex: 1, fontSize: 11, color: '#44474a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item[nameKey]}</span>
                 <div style={{ width: 80, background: '#f1f5f9', borderRadius: 4, height: 6, flexShrink: 0, overflow: 'hidden' }}>
@@ -160,20 +162,6 @@ const RenderChart = ({ data, mode, dataKey, nameKey, height = 280 }) => {
           })}
         </div>
       </>
-    );
-  }
-
-  if (mode === 'line') {
-    return (
-      <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={data} margin={{ top: 20, right: 30, left: 10, bottom: 60 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-          <XAxis dataKey={nameKey} tick={{ fontSize: 11, fill: '#6a6d70' }} angle={-45} textAnchor="end" height={70} tickLine={false} />
-          <YAxis tickFormatter={fmtShort} tick={{ fontSize: 11, fill: '#6a6d70' }} axisLine={false} tickLine={false} />
-          <Tooltip content={<ChartTooltip formatter={fmtShort} />} />
-          <Line type="monotone" dataKey={dataKey} name="Getiri" stroke="#3b82f6" strokeWidth={2.5} dot={{ fill: '#3b82f6', r: 4 }} />
-        </LineChart>
-      </ResponsiveContainer>
     );
   }
 
@@ -197,7 +185,7 @@ const RenderChart = ({ data, mode, dataKey, nameKey, height = 280 }) => {
 const OzetTab = ({ ozet, lokasyonData, tedarikciData, trendData, trendYil, setTrendYil }) => {
   const [lokMode, setLokMode] = useState('bar');
   const [tedMode, setTedMode] = useState('bar');
-  const [trendMode, setTrendMode] = useState('line');
+  const [trendMode, setTrendMode] = useState('bar');
   const sortedTedarikci = (tedarikciData || []).slice().sort((a, b) => (b.toplam_kazanc_tl || 0) - (a.toplam_kazanc_tl || 0));
 
   return (
