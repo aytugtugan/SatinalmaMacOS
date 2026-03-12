@@ -33,28 +33,38 @@ const fmtShort = (val) => {
 };
 
 const RADIAN = Math.PI / 180;
-const renderCombinedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, value }) => {
+const renderCombinedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, value, name }) => {
   if (percent < 0.03) return null;
-  // İçeride: değer (sayı)
-  const ri = innerRadius + (outerRadius - innerRadius) * 0.55;
+  const ri = innerRadius + (outerRadius - innerRadius) * 0.5;
   const xi = cx + ri * Math.cos(-midAngle * RADIAN);
   const yi = cy + ri * Math.sin(-midAngle * RADIAN);
-  // Dışarıda: % etiketi ve çizgi
   const ro1 = outerRadius + 8;
-  const ro2 = outerRadius + 26;
+  const ro2 = outerRadius + 28;
   const x1 = cx + ro1 * Math.cos(-midAngle * RADIAN);
   const y1 = cy + ro1 * Math.sin(-midAngle * RADIAN);
   const x2 = cx + ro2 * Math.cos(-midAngle * RADIAN);
   const y2 = cy + ro2 * Math.sin(-midAngle * RADIAN);
   const anchor = x2 > cx ? 'start' : 'end';
+  const shortName = name ? (name.length > 9 ? name.substring(0, 9) + '..' : name) : '';
   return (
     <g>
-      {percent > 0.07 && (
+      {percent >= 0.10 ? (
+        <g>
+          <text x={xi} y={yi - 7} fill="#fff" textAnchor="middle" dominantBaseline="central"
+            style={{ fontSize: 9, fontWeight: 600 }}>
+            {shortName}
+          </text>
+          <text x={xi} y={yi + 7} fill="#fff" textAnchor="middle" dominantBaseline="central"
+            style={{ fontSize: 10, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
+            {fmtShort(value)}
+          </text>
+        </g>
+      ) : percent > 0.06 ? (
         <text x={xi} y={yi} fill="#fff" textAnchor="middle" dominantBaseline="central"
-          style={{ fontSize: 11, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
+          style={{ fontSize: 10, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
           {fmtShort(value)}
         </text>
-      )}
+      ) : null}
       <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#94a3b8" strokeWidth={1} />
       <text x={x2 + (anchor === 'start' ? 4 : -4)} y={y2} fill="#374151"
         textAnchor={anchor} dominantBaseline="central" style={{ fontSize: 11, fontWeight: 700 }}>
@@ -306,7 +316,7 @@ const OzetTab = ({ ozet, lokasyonData, tedarikciData, trendData, trendYil, setTr
         {/* Lokasyon */}
         <ChartCard title="Lokasyon Getiri Dağılımı" headerRight={<ChartSwitch mode={lokMode} setMode={setLokMode} />}>
           <RenderChart data={lokasyonData} mode={lokMode} dataKey="toplam_kazanc_tl" nameKey="lokasyon" />
-          {lokasyonData?.length > 0 && (
+          {lokasyonData?.length > 0 && lokMode !== 'pie' && (
             <LegendTable headers={['Lokasyon', 'İhale', 'Getiri']}
               rows={lokasyonData.map((item, i) => [
                 <span key="n" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -323,7 +333,7 @@ const OzetTab = ({ ozet, lokasyonData, tedarikciData, trendData, trendYil, setTr
         {/* Tedarikçi */}
           <ChartCard title="Tedarikçi Kazanç Dağılımı" headerRight={<ChartSwitch mode={tedMode} setMode={setTedMode} />}>
           <RenderChart data={visibleTedarikci} mode={tedMode} dataKey="toplam_kazanc_tl" nameKey="kazanan_tedarikci" />
-          {sortedTedarikci?.length > 0 && (
+          {sortedTedarikci?.length > 0 && tedMode !== 'pie' && (
             <>
               <LegendTable headers={['Tedarikçi', 'Adet', 'Kazanç']}
                 rows={visibleTedarikci.map((item, i) => [
@@ -362,7 +372,7 @@ const OzetTab = ({ ozet, lokasyonData, tedarikciData, trendData, trendYil, setTr
         }
       >
         <RenderChart data={trendData} mode={trendMode} dataKey="toplam_kazanc_tl" nameKey="ay_isim" height={300} />
-        {trendData?.length > 0 && (
+        {trendData?.length > 0 && trendMode !== 'pie' && (
           <LegendTable headers={['Ay', 'İhale', 'Getiri']}
             rows={trendData.map((item, i) => [
               <span key="n" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
