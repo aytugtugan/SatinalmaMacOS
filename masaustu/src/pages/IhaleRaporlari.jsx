@@ -166,7 +166,7 @@ const RenderChart = ({ data, mode, dataKey, nameKey, height = 280 }) => {
             {/* Yüzey katmanı */}
             <Pie data={pieData} dataKey={dataKey} nameKey={nameKey}
               cx="50%" cy="46%" outerRadius={88} innerRadius={0} paddingAngle={0}
-              label={({ value, percent }) => percent > 0.03 ? `${fmtShort(value)}; ${(percent * 100).toFixed(0)}%` : ''}
+              label={({ value, percent }) => percent > 0.03 ? `${fmtCurrency(value)}; ${(percent * 100).toFixed(0)}%` : ''}
               labelLine={{ stroke: '#64748b', strokeWidth: 1 }}
             >
               {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="#fff" strokeWidth={2} />)}

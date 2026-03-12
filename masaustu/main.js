@@ -2,8 +2,7 @@ const { app, BrowserWindow, ipcMain, Menu, dialog, shell } = require('electron')
 const { autoUpdater } = require('electron-updater');
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
-// Ozel GitHub reposu icin token - tum makinelerde guncelleme calissin
-autoUpdater.requestHeaders = { 'Authorization': 'token TOKEN_REMOVED' };
+// Public repo - token gerekmez
 // Guncelleme logunu dosyaya yaz
 const log = require('electron-log');
 autoUpdater.logger = log;
