@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import {
   TrophyOutlined, BarChartOutlined, PieChartFilled,
-  LeftOutlined, RightOutlined,
+  LeftOutlined, RightOutlined, CloseOutlined, EnvironmentOutlined,
   SwapOutlined, DollarOutlined, ThunderboltOutlined, CrownOutlined,
   FireOutlined, AimOutlined, ReloadOutlined,
 } from '@ant-design/icons';
@@ -21,8 +21,8 @@ const COLORS = [
 ];
 
 const fmtCurrency = (val) => {
-  if (!val && val !== 0) return '0 TL';
-  return new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val) + ' TL';
+  if (!val && val !== 0) return '₺0';
+  return '₺' + new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);
 };
 
 const fmtShort = (val) => {
@@ -70,21 +70,32 @@ const ChartSwitch = ({ mode, setMode, types = ['bar', 'pie'] }) => (
 const AY_ISIM = ['Oca', 'Sub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Agu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 
 /* ============ KPI Cards ============ */
-const KpiCards = ({ ozet }) => {
+const KpiCards = ({ ozet, onCardClick }) => {
   const cards = [
-    { icon: <TrophyOutlined />, color: '#3b82f6', value: ozet?.toplam_ihale_sayisi?.toLocaleString('tr-TR') || '0', label: 'Toplam İhale' },
-    { icon: <DollarOutlined />, color: '#10b981', value: fmtCurrency(ozet?.toplam_kazanc_tl), label: 'Toplam Getiri' },
-    { icon: <ThunderboltOutlined />, color: '#f59e0b', value: fmtCurrency(ozet?.ortalama_kazanc_tl), label: 'Ortalama' },
-    { icon: <CrownOutlined />, color: '#8b5cf6', value: fmtCurrency(ozet?.en_yuksek_kazanc?.tutar), label: 'En Yüksek' },
+    { key: 'toplam', icon: <TrophyOutlined />, color: '#3b82f6', value: ozet?.toplam_ihale_sayisi?.toLocaleString('tr-TR') || '0', label: 'Toplam İhale' },
+    { key: 'getiri', icon: <DollarOutlined />, color: '#10b981', value: fmtCurrency(ozet?.toplam_kazanc_tl), label: 'Toplam Getiri' },
+    { key: 'ortalama', icon: <ThunderboltOutlined />, color: '#f59e0b', value: fmtCurrency(ozet?.ortalama_kazanc_tl), label: 'Ortalama' },
+    { key: 'en_yuksek', icon: <CrownOutlined />, color: '#8b5cf6', value: fmtCurrency(ozet?.en_yuksek_kazanc?.tutar), label: 'En Yüksek', hasDetail: true },
   ];
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
       {cards.map((c, i) => (
-        <div key={i} style={{ background: '#fff', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div key={i}
+          onClick={() => c.hasDetail && onCardClick && onCardClick(c.key)}
+          style={{
+            background: '#fff', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+            display: 'flex', alignItems: 'center', gap: 16,
+            cursor: c.hasDetail ? 'pointer' : 'default',
+            transition: 'box-shadow 0.2s, transform 0.2s',
+            ...(c.hasDetail ? { border: '1px solid transparent' } : {}),
+          }}
+          onMouseEnter={e => { if (c.hasDetail) { e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)'; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = c.color + '40'; } }}
+          onMouseLeave={e => { if (c.hasDetail) { e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)'; e.currentTarget.style.transform = ''; e.currentTarget.style.borderColor = 'transparent'; } }}
+        >
           <div style={{ width: 48, height: 48, borderRadius: 12, background: c.color + '15', color: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>{c.icon}</div>
           <div>
             <div style={{ fontSize: 20, fontWeight: 700, color: '#1e293b' }}>{c.value}</div>
-            <div style={{ fontSize: 13, color: '#94a3b8' }}>{c.label}</div>
+            <div style={{ fontSize: 13, color: '#94a3b8' }}>{c.label}{c.hasDetail ? ' ▸' : ''}</div>
           </div>
         </div>
       ))}
@@ -186,11 +197,71 @@ const OzetTab = ({ ozet, lokasyonData, tedarikciData, trendData, trendYil, setTr
   const [lokMode, setLokMode] = useState('bar');
   const [tedMode, setTedMode] = useState('bar');
   const [trendMode, setTrendMode] = useState('bar');
+  const [showAllTed, setShowAllTed] = useState(false);
+  const [kpiDetail, setKpiDetail] = useState(null);
   const sortedTedarikci = (tedarikciData || []).slice().sort((a, b) => (b.toplam_kazanc_tl || 0) - (a.toplam_kazanc_tl || 0));
+  const visibleTedarikci = showAllTed ? sortedTedarikci : sortedTedarikci.slice(0, 10);
+
+  const handleKpiClick = (key) => {
+    if (key === 'en_yuksek' && ozet?.en_yuksek_kazanc) {
+      setKpiDetail(ozet.en_yuksek_kazanc);
+    }
+  };
+
+  const formatDate = (d) => {
+    if (!d) return '-';
+    const date = new Date(d);
+    return date.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
 
   return (
     <div>
-      <KpiCards ozet={ozet} />
+      <KpiCards ozet={ozet} onCardClick={handleKpiClick} />
+
+      {/* KPI Detail Modal */}
+      {kpiDetail && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+          onClick={() => setKpiDetail(null)}>
+          <div style={{ background: '#fff', borderRadius: 16, width: 520, maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', overflow: 'hidden' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ color: '#fff' }}>
+                <div style={{ fontSize: 14, opacity: 0.85 }}>En Yüksek Kazançlı İhale</div>
+                <div style={{ fontSize: 28, fontWeight: 800 }}>{fmtCurrency(kpiDetail.tutar)}</div>
+              </div>
+              <button onClick={() => setKpiDetail(null)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#fff', fontSize: 16 }}><CloseOutlined /></button>
+            </div>
+            <div style={{ padding: '20px 24px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                <div><div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>MALZEME/HİZMET</div><div style={{ fontWeight: 600, color: '#1e293b' }}>{kpiDetail.malzeme || '-'}</div></div>
+                <div><div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>KAZANAN TEDARİKÇİ</div><div style={{ fontWeight: 600, color: '#059669' }}>{kpiDetail.kazanan_tedarikci || '-'}</div></div>
+                <div><div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>LOKASYON</div><div style={{ fontWeight: 500 }}><EnvironmentOutlined /> {kpiDetail.lokasyon || '-'}</div></div>
+                <div><div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>TARİH</div><div style={{ fontWeight: 500 }}>{formatDate(kpiDetail.tarih)}</div></div>
+                {kpiDetail.siparis_numarasi && <div><div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>SİPARİŞ NO</div><div style={{ fontWeight: 500, fontFamily: 'monospace' }}>{kpiDetail.siparis_numarasi}</div></div>}
+              </div>
+              {/* Firmalar */}
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 8 }}>TEKLİFLER</div>
+                {[1,2,3,4,5].map(i => {
+                  const firma = kpiDetail[`firma_${i}`];
+                  const teklif = kpiDetail[`teklif_${i}_tl`];
+                  if (!firma && !teklif) return null;
+                  const kazandi = firma === kpiDetail.kazanan_tedarikci;
+                  return (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', marginBottom: 4, borderRadius: 8, background: kazandi ? '#f0fdf4' : '#f8fafc', border: kazandi ? '1px solid #86efac' : '1px solid #f1f5f9' }}>
+                      <span style={{ fontWeight: kazandi ? 700 : 400, color: kazandi ? '#15803d' : '#1e293b' }}>{firma || '-'}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontWeight: 600 }}>{fmtCurrency(teklif)}</span>
+                        {kazandi && <span style={{ background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>Kazandı</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))', gap: 20, marginBottom: 20 }}>
         {/* Lokasyon */}
@@ -211,25 +282,35 @@ const OzetTab = ({ ozet, lokasyonData, tedarikciData, trendData, trendYil, setTr
         </ChartCard>
 
         {/* Tedarikçi */}
-          <ChartCard title="Tedarikçi Getiri Dağılımı" headerRight={<ChartSwitch mode={tedMode} setMode={setTedMode} />}>
-          <RenderChart data={sortedTedarikci.slice(0, 10)} mode={tedMode} dataKey="toplam_kazanc_tl" nameKey="kazanan_tedarikci" />
+          <ChartCard title="Tedarikçi Kazanç Dağılımı" headerRight={<ChartSwitch mode={tedMode} setMode={setTedMode} />}>
+          <RenderChart data={visibleTedarikci} mode={tedMode} dataKey="toplam_kazanc_tl" nameKey="kazanan_tedarikci" />
           {sortedTedarikci?.length > 0 && (
-            <LegendTable headers={['Tedarikçi', 'Kazandığı', 'Getiri']}
-              rows={sortedTedarikci.slice(0, 10).map((item, i) => [
-                <span key="n" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: COLORS[i % COLORS.length], display: 'inline-block' }} />
-                  {i + 1}. {item.kazanan_tedarikci}
-                </span>,
-                item.kazandigi_ihale_sayisi,
-                <strong key="v">{fmtCurrency(item.toplam_kazanc_tl)}</strong>,
-              ])}
-            />
+            <>
+              <LegendTable headers={['Tedarikçi', 'Adet', 'Kazanç']}
+                rows={visibleTedarikci.map((item, i) => [
+                  <span key="n" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: COLORS[i % COLORS.length], display: 'inline-block' }} />
+                    {i + 1}. {item.kazanan_tedarikci}
+                  </span>,
+                  <span key="a" style={{ fontWeight: 600 }}>{item.kazandigi_ihale_sayisi} ihale</span>,
+                  <strong key="v">{fmtCurrency(item.toplam_kazanc_tl)}</strong>,
+                ])}
+              />
+              {sortedTedarikci.length > 10 && (
+                <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
+                  <button onClick={() => setShowAllTed(v => !v)}
+                    style={{ background: '#eff6ff', color: '#3b82f6', border: '1px solid #bfdbfe', borderRadius: 8, padding: '6px 20px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                    {showAllTed ? 'İlk 10\'u Göster' : `Tümünü Gör (${sortedTedarikci.length})`}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </ChartCard>
       </div>
 
       {/* Trend */}
-      <ChartCard title="Aylık Trend" icon={<LineChartOutlined />}
+      <ChartCard title="Aylık Trend" icon={<BarChartOutlined />}
         headerRight={
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -243,7 +324,7 @@ const OzetTab = ({ ozet, lokasyonData, tedarikciData, trendData, trendYil, setTr
       >
         <RenderChart data={trendData} mode={trendMode} dataKey="toplam_kazanc_tl" nameKey="ay_isim" height={300} />
         {trendData?.length > 0 && (
-          <LegendTable headers={['Ay', 'İhale', 'Getiri', 'Değişim']}
+          <LegendTable headers={['Ay', 'İhale', 'Getiri']}
             rows={trendData.map((item, i) => [
               <span key="n" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ width: 10, height: 10, borderRadius: '50%', background: COLORS[i % COLORS.length], display: 'inline-block' }} />
@@ -251,9 +332,6 @@ const OzetTab = ({ ozet, lokasyonData, tedarikciData, trendData, trendYil, setTr
               </span>,
               item.ihale_sayisi,
               <strong key="v">{fmtCurrency(item.toplam_kazanc_tl)}</strong>,
-              <span key="c" style={{ color: item.bir_onceki_aya_gore_degisim_yuzdesi == null ? '#94a3b8' : item.bir_onceki_aya_gore_degisim_yuzdesi >= 0 ? '#10b981' : '#ef4444', fontWeight: 600 }}>
-                {item.bir_onceki_aya_gore_degisim_yuzdesi == null ? '-' : (item.bir_onceki_aya_gore_degisim_yuzdesi >= 0 ? '+' : '') + item.bir_onceki_aya_gore_degisim_yuzdesi.toFixed(1) + '%'}
-              </span>,
             ])}
           />
         )}
@@ -418,7 +496,7 @@ const IhaleRaporlari = ({ selectedAmbar = '' }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <BarChartOutlined style={{ fontSize: 28, color: '#3b82f6' }} />
           <div>
-            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#1e293b' }}>İhale Raporları</h2>
+            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#1e293b' }}>₺ İhale Raporları</h2>
             <p style={{ margin: 0, fontSize: 13, color: '#94a3b8' }}>İhale kazanç takip, analiz ve raporları</p>
           </div>
         </div>

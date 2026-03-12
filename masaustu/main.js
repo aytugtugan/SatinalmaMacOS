@@ -501,7 +501,19 @@ function calcOzet(records) {
     toplam_ihale_sayisi: total,
     toplam_kazanc_tl: Math.round(totalKazanc),
     ortalama_kazanc_tl: Math.round(avg),
-    en_yuksek_kazanc: maxRec ? { tutar: Math.round(maxRec.kazanc_tutari_tl || 0), malzeme: maxRec.malzeme_hizmet } : { tutar: 0 },
+    en_yuksek_kazanc: maxRec ? {
+      tutar: Math.round(maxRec.kazanc_tutari_tl || 0),
+      malzeme: maxRec.malzeme_hizmet,
+      kazanan_tedarikci: maxRec.kazanan_tedarikci,
+      lokasyon: maxRec.lokasyon,
+      tarih: maxRec.tarih,
+      siparis_numarasi: maxRec.siparis_numarasi,
+      firma_1: maxRec.firma_1, teklif_1_tl: maxRec.teklif_1_tl,
+      firma_2: maxRec.firma_2, teklif_2_tl: maxRec.teklif_2_tl,
+      firma_3: maxRec.firma_3, teklif_3_tl: maxRec.teklif_3_tl,
+      firma_4: maxRec.firma_4, teklif_4_tl: maxRec.teklif_4_tl,
+      firma_5: maxRec.firma_5, teklif_5_tl: maxRec.teklif_5_tl,
+    } : { tutar: 0 },
   };
 }
 
