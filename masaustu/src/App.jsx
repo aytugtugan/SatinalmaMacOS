@@ -8,7 +8,11 @@ import SiparisAnaliz from './pages/SiparisAnaliz';
 import TedarikciAnaliz from './pages/TedarikciAnaliz';
 import FinansalAnaliz from './pages/FinansalAnaliz';
 import DetayliRapor from './pages/DetayliRapor';
-import { ShopOutlined, ReloadOutlined, MinusOutlined, FullscreenOutlined, FullscreenExitOutlined, CloseOutlined } from '@ant-design/icons';
+import IhaleYonetimi from './pages/IhaleYonetimi';
+import IhaleRaporlari from './pages/IhaleRaporlari';
+import TedarikciKategori from './pages/TedarikciKategori';
+import TedarikciKategoriRaporlari from './pages/TedarikciKategoriRaporlari';
+import { ShopOutlined, ReloadOutlined, MinusOutlined, FullscreenOutlined, FullscreenExitOutlined, CloseOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import './styles.css';
 
 const App = () => {
@@ -22,9 +26,16 @@ const App = () => {
   const [selectedAmbar, setSelectedAmbar] = useState('all');
   const [comparisonData, setComparisonData] = useState({});
   const [isFullscreen, setIsFullscreen] = useState(true);
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [updateStatus, setUpdateStatus] = useState(null); // null | 'downloading' | 'ready'
   const [updateVersion, setUpdateVersion] = useState('');
   const [downloadPercent, setDownloadPercent] = useState(0);
+
+  // Saat güncelleyici
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Güncelleme event listener
   useEffect(() => {
@@ -43,6 +54,18 @@ const App = () => {
       window.api.onUpdateDownloaded((info) => {
         setUpdateStatus('ready');
         setUpdateVersion(info?.version || '');
+      });
+    }
+    if (window.api?.onUpdateNotAvailable) {
+      window.api.onUpdateNotAvailable(() => {
+        setUpdateStatus('current');
+        setTimeout(() => setUpdateStatus(null), 4000);
+      });
+    }
+    if (window.api?.onUpdateError) {
+      window.api.onUpdateError((msg) => {
+        setUpdateStatus('error');
+        setTimeout(() => setUpdateStatus(null), 5000);
       });
     }
   }, []);
@@ -183,7 +206,15 @@ const App = () => {
       case 'finansal':
         return <FinansalAnaliz data={dashboardData} columns={columnMapping} comparisonData={comparisonData} selectedAmbar={selectedAmbar} />;
       case 'detay':
-        return <DetayliRapor data={allData} selectedAmbar={selectedAmbar} columns={columnMapping} />;
+        return <DetayliRapor data={allData} selectedIsyeri={selectedAmbar} columns={columnMapping} />;
+      case 'ihale':
+        return <IhaleYonetimi selectedAmbar={selectedAmbar} />;
+      case 'ihaleRapor':
+        return <IhaleRaporlari selectedAmbar={selectedAmbar} />;
+      case 'tedarikciKategori':
+        return <TedarikciKategori />;
+      case 'tedarikciKategoriRapor':
+        return <TedarikciKategoriRaporlari />;
       default:
         return <Dashboard data={dashboardData} columns={columnMapping} comparisonData={comparisonData} selectedAmbar={selectedAmbar} />;
     }
@@ -267,6 +298,13 @@ const App = () => {
                 />
               </div>
               <div className="filter-right">
+                <div className="clock-display">
+                  <ClockCircleOutlined className="clock-icon" />
+                  <div className="clock-content">
+                    <span className="clock-time">{currentTime.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                    <span className="clock-date">{currentTime.toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                  </div>
+                </div>
                 <button className="refresh-btn" onClick={handleRefresh} disabled={loading}>
                   <ReloadOutlined spin={loading} />
                   <span>Yenile</span>

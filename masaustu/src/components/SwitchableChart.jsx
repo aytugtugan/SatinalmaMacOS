@@ -250,18 +250,18 @@ const SwitchableChart = ({
                 cy="50%"
                 outerRadius={90}
                 innerRadius={50}
-                paddingAngle={2}
-                label={({ name, percent }) => 
-                  percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ''
+                paddingAngle={0}
+                label={({ name, percent }) =>
+                  percent > 0.04 ? `${name ? name.substring(0, 10) : ''} ${(percent * 100).toFixed(0)}%` : ''
                 }
-                labelLine={false}
+                labelLine={true}
               >
                 {sortedData.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
+                  <Cell
+                    key={`cell-${index}`}
                     fill={COLORS[index % COLORS.length]}
-                    stroke="#fff"
-                    strokeWidth={2}
+                    stroke="none"
+                    strokeWidth={0}
                   />
                 ))}
               </Pie>
@@ -431,7 +431,7 @@ const SwitchableChart = ({
     }
   };
 
-  const pctTotal = showPct ? sortedData.reduce((s, d) => s + (toNumber(d[dataKey]) || 0), 0) : 0;
+  const pctTotal = (showPct || effectiveType === 'pie') ? sortedData.reduce((s, d) => s + (toNumber(d[dataKey]) || 0), 0) : 0;
 
   return (
     <div className={`chart-card${expanded ? ' full-width' : ''}`}>
@@ -454,7 +454,7 @@ const SwitchableChart = ({
       <div className="chart-body">
         {renderChart()}
       </div>
-      {showPct && sortedData.length > 0 && (
+      {(showPct || effectiveType === 'pie') && sortedData.length > 0 && (
         <div style={{ padding: '0 16px 12px', borderTop: '1px solid #f1f5f9', marginTop: 4 }}>
           {sortedData.map((item, i) => {
             const val = toNumber(item[dataKey]) || 0;

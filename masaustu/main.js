@@ -74,44 +74,25 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
-  createWindow();
-
-  // Auto-update kontrolü (production modda)
-  if (!process.argv.includes('--dev')) {
-    autoUpdater.checkForUpdatesAndNotify();
-    
-    // Her 30 dakikada bir güncelleme kontrolü
-    setInterval(() => {
-      autoUpdater.checkForUpdatesAndNotify();
-    }, 30 * 60 * 1000);
-  }
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
-});
-
-// Auto-updater event handlers
-autoUpdater.on('checking-for-update', () => {
-  console.log('Güncelleme kontrolü yapılıyor...');
-});
-
 autoUpdater.on('update-available', (info) => {
-  console.log('Yeni güncelleme bulundu:', info.version);
+  console.log('Güncelleme mevcut:', info.version);
   if (mainWindow) {
     mainWindow.webContents.send('update-available', info);
   }
 });
 
-autoUpdater.on('update-not-available', () => {
+autoUpdater.on('update-not-available', (info) => {
   console.log('Uygulama güncel.');
+  if (mainWindow) {
+    mainWindow.webContents.send('update-not-available', info);
+  }
 });
 
 autoUpdater.on('error', (err) => {
   console.error('Güncelleme hatası:', err);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-error', err.message);
+  }
 });
 
 autoUpdater.on('download-progress', (progressObj) => {
@@ -134,6 +115,24 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.whenReady().then(() => {
+  createWindow();
+
+  // Auto-update kontrolü (production modda)
+  if (!process.argv.includes('--dev')) {
+    autoUpdater.checkForUpdatesAndNotify();
+
+    // Her 30 dakikada bir güncelleme kontrolü
+    setInterval(() => {
+      autoUpdater.checkForUpdatesAndNotify();
+    }, 30 * 60 * 1000);
+  }
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
 });
 
 // Window Control IPC Handlers
@@ -397,4 +396,338 @@ ipcMain.handle('dosya-goruntule', async (event, id) => {
 // Dosya görüntüleme URL'si döndür
 ipcMain.handle('dosya-goruntule-url', (event, id) => {
   return { success: true, url: `${DOSYA_API_URL}/api/Dosya/goruntule/${id}` };
+});
+
+// ─── İhale IPC Handlers ─────────────────────────────────
+
+const IHALE_API_URL = 'http://10.35.20.17:5055';
+
+async function ihaleFetch(path, options = {}) {
+  const res = await fetch(`${IHALE_API_URL}${path}`, {
+    headers: { 'Content-Type': 'application/json', ...options.headers },
+    ...options,
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+  return json;
+}
+
+// Tüm ihale kayıtlarını çek (rapor hesaplamaları için)
+async function fetchAllIhaleRecords(extraParams = {}) {
+  const qs = new URLSearchParams({ limit: '10000', ...extraParams });
+  const json = await ihaleFetch(`/api/ihaleler?${qs.toString()}`);
+  return json.data || [];
+}
+
+ipcMain.handle('ihale-list', async (event, params) => {
+  try {
+    const qs = new URLSearchParams();
+    if (params?.lokasyon) qs.set('lokasyon', params.lokasyon);
+    if (params?.tarih_baslangic) qs.set('tarih_baslangic', params.tarih_baslangic);
+    if (params?.tarih_bitis) qs.set('tarih_bitis', params.tarih_bitis);
+    if (params?.page) qs.set('page', params.page);
+    if (params?.limit) qs.set('limit', params.limit);
+    const query = qs.toString();
+    const data = await ihaleFetch(`/api/ihaleler${query ? '?' + query : ''}`);
+    return { success: true, ...data };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('ihale-get', async (event, siraNo) => {
+  try {
+    const data = await ihaleFetch(`/api/ihaleler/${siraNo}`);
+    return { success: true, ...data };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('ihale-create', async (event, dto) => {
+  try {
+    const data = await ihaleFetch('/api/ihaleler', { method: 'POST', body: JSON.stringify(dto) });
+    return { success: true, ...data };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('ihale-update', async (event, { siraNo, dto }) => {
+  try {
+    const data = await ihaleFetch(`/api/ihaleler/${siraNo}`, { method: 'PUT', body: JSON.stringify(dto) });
+    return { success: true, ...data };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('ihale-delete', async (event, siraNo) => {
+  try {
+    const data = await ihaleFetch(`/api/ihaleler/${siraNo}`, { method: 'DELETE' });
+    return { success: true, ...data };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('ihale-lokasyonlar', async () => {
+  try {
+    const records = await fetchAllIhaleRecords();
+    const lokSet = new Set(records.map(r => r.lokasyon).filter(Boolean));
+    const data = [...lokSet].sort();
+    return { success: true, data };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+// ─── Yardımcı rapor hesaplama fonksiyonları ─────────────
+
+function filterByParams(records, params) {
+  let data = records;
+  if (params?.lokasyon) {
+    const normLok = (params.lokasyon || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    data = data.filter(r => {
+      const rl = (r.lokasyon || '').toLowerCase().replace(/\s+/g, ' ').trim();
+      return rl === normLok || rl.includes(normLok) || normLok.includes(rl);
+    });
+  }
+  if (params?.tarih_baslangic) {
+    const d = new Date(params.tarih_baslangic);
+    data = data.filter(r => new Date(r.tarih) >= d);
+  }
+  if (params?.tarih_bitis) {
+    const d = new Date(params.tarih_bitis);
+    data = data.filter(r => new Date(r.tarih) <= d);
+  }
+  return data;
+}
+
+function calcOzet(records) {
+  const total = records.length;
+  const totalKazanc = records.reduce((s, r) => s + (r.kazanc_tutari_tl || 0), 0);
+  const avg = total > 0 ? totalKazanc / total : 0;
+  const maxRec = records.reduce((mx, r) => (!mx || (r.kazanc_tutari_tl || 0) > (mx.kazanc_tutari_tl || 0)) ? r : mx, null);
+  return {
+    toplam_ihale_sayisi: total,
+    toplam_kazanc_tl: Math.round(totalKazanc),
+    ortalama_kazanc_tl: Math.round(avg),
+    en_yuksek_kazanc: maxRec ? { tutar: Math.round(maxRec.kazanc_tutari_tl || 0), malzeme: maxRec.malzeme_hizmet } : { tutar: 0 },
+  };
+}
+
+function calcLokasyon(records) {
+  const map = {};
+  for (const r of records) {
+    const l = r.lokasyon || 'Diğer';
+    if (!map[l]) map[l] = { lokasyon: l, ihale_sayisi: 0, toplam_kazanc_tl: 0 };
+    map[l].ihale_sayisi++;
+    map[l].toplam_kazanc_tl += (r.kazanc_tutari_tl || 0);
+  }
+  return Object.values(map)
+    .sort((a, b) => b.toplam_kazanc_tl - a.toplam_kazanc_tl)
+    .map(x => ({ ...x, toplam_kazanc_tl: Math.round(x.toplam_kazanc_tl) }));
+}
+
+function calcTedarikci(records) {
+  const map = {};
+  for (const r of records) {
+    const t = r.kazanan_tedarikci || 'Bilinmiyor';
+    if (!map[t]) map[t] = { kazanan_tedarikci: t, kazandigi_ihale_sayisi: 0, toplam_kazanc_tl: 0 };
+    map[t].kazandigi_ihale_sayisi++;
+    map[t].toplam_kazanc_tl += (r.kazanc_tutari_tl || 0);
+  }
+  return Object.values(map)
+    .sort((a, b) => b.toplam_kazanc_tl - a.toplam_kazanc_tl)
+    .map(x => ({ ...x, toplam_kazanc_tl: Math.round(x.toplam_kazanc_tl) }));
+}
+
+function calcRekabet(records) {
+  const map = {};
+  for (const r of records) {
+    const firmalar = [r.firma_1, r.firma_2, r.firma_3, r.firma_4, r.firma_5].filter(f => f && f.trim());
+    for (let i = 0; i < firmalar.length; i++) {
+      for (let j = i + 1; j < firmalar.length; j++) {
+        const a = firmalar[i].trim(), b = firmalar[j].trim();
+        const key = a < b ? `${a}|||${b}` : `${b}|||${a}`;
+        if (!map[key]) map[key] = { firma_a: a < b ? a : b, firma_b: a < b ? b : a, kac_ihalede_karsilastilar: 0 };
+        map[key].kac_ihalede_karsilastilar++;
+      }
+    }
+  }
+  return Object.values(map).sort((a, b) => b.kac_ihalede_karsilastilar - a.kac_ihalede_karsilastilar).slice(0, 50);
+}
+
+function calcTrend(records, yil) {
+  const y = parseInt(yil) || new Date().getFullYear();
+  const AY = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+  const months = AY.map((ay_isim, i) => ({ ay: i + 1, ay_isim, ihale_sayisi: 0, toplam_kazanc_tl: 0, bir_onceki_aya_gore_degisim_yuzdesi: null }));
+  for (const r of records) {
+    const d = new Date(r.tarih);
+    if (d.getFullYear() === y) {
+      months[d.getMonth()].ihale_sayisi++;
+      months[d.getMonth()].toplam_kazanc_tl += (r.kazanc_tutari_tl || 0);
+    }
+  }
+  for (let i = 1; i < 12; i++) {
+    const prev = months[i - 1].toplam_kazanc_tl;
+    const curr = months[i].toplam_kazanc_tl;
+    if (prev !== 0) months[i].bir_onceki_aya_gore_degisim_yuzdesi = Math.round((curr - prev) / prev * 1000) / 10;
+  }
+  return months.map(m => ({ ...m, toplam_kazanc_tl: Math.round(m.toplam_kazanc_tl) }));
+}
+
+function calcTasarruf(records) {
+  return records
+    .filter(r => r.kazanc_tutari_tl > 0)
+    .map(r => {
+      const teklifler = [r.teklif_1_tl, r.teklif_2_tl, r.teklif_3_tl, r.teklif_4_tl, r.teklif_5_tl].filter(t => t != null && t > 0);
+      const enYuksek = teklifler.length > 0 ? Math.max(...teklifler) : 0;
+      const oran = enYuksek > 0 ? Math.round((r.kazanc_tutari_tl / enYuksek) * 1000) / 10 : 0;
+      return { malzeme_hizmet: r.malzeme_hizmet, kazanan_tedarikci: r.kazanan_tedarikci, en_yuksek_teklif_tl: Math.round(enYuksek), kazanc_tutari_tl: Math.round(r.kazanc_tutari_tl || 0), tasarruf_orani_yuzde: oran };
+    })
+    .sort((a, b) => b.tasarruf_orani_yuzde - a.tasarruf_orani_yuzde)
+    .slice(0, 100);
+}
+
+ipcMain.handle('ihale-rapor-ozet', async (event, params) => {
+  try {
+    const records = filterByParams(await fetchAllIhaleRecords(), params);
+    return { success: true, data: calcOzet(records) };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('ihale-rapor-lokasyon', async (event, params) => {
+  try {
+    const records = filterByParams(await fetchAllIhaleRecords(), params);
+    return { success: true, data: calcLokasyon(records) };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('ihale-rapor-tedarikci', async (event, params) => {
+  try {
+    const records = filterByParams(await fetchAllIhaleRecords(), params);
+    return { success: true, data: calcTedarikci(records) };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('ihale-rapor-rekabet', async (event, params) => {
+  try {
+    const records = filterByParams(await fetchAllIhaleRecords(), params);
+    return { success: true, data: calcRekabet(records) };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('ihale-rapor-trend', async (event, params) => {
+  try {
+    const records = filterByParams(await fetchAllIhaleRecords(), params);
+    return { success: true, data: calcTrend(records, params?.yil || new Date().getFullYear()) };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('ihale-rapor-tasarruf', async (event, params) => {
+  try {
+    const records = filterByParams(await fetchAllIhaleRecords(), params);
+    return { success: true, data: calcTasarruf(records) };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+// ─── Tedarikçi Kategori IPC Handlers ─────────────────────
+
+ipcMain.handle('tedarikci-kategori-list', async (event, params) => {
+  try {
+    const qs = new URLSearchParams();
+    if (params?.tip) qs.set('tip', params.tip);
+    if (params?.kategori) qs.set('kategori', params.kategori);
+    if (params?.tedarikci) qs.set('tedarikci', params.tedarikci);
+    if (params?.search) qs.set('search', params.search);
+    if (params?.page) qs.set('page', params.page);
+    if (params?.limit) qs.set('limit', params.limit);
+    const query = qs.toString();
+    const data = await ihaleFetch(`/api/TedarikciKategori${query ? '?' + query : ''}`);
+    return { success: true, ...data };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('tedarikci-kategori-get', async (event, id) => {
+  try {
+    const data = await ihaleFetch(`/api/TedarikciKategori/${id}`);
+    return { success: true, ...data };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('tedarikci-kategori-create', async (event, dto) => {
+  try {
+    const data = await ihaleFetch('/api/TedarikciKategori', { method: 'POST', body: JSON.stringify(dto) });
+    return { success: true, ...data };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('tedarikci-kategori-update', async (event, { id, dto }) => {
+  try {
+    const data = await ihaleFetch(`/api/TedarikciKategori/${id}`, { method: 'PUT', body: JSON.stringify(dto) });
+    return { success: true, ...data };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('tedarikci-kategori-delete', async (event, id) => {
+  try {
+    const data = await ihaleFetch(`/api/TedarikciKategori/${id}`, { method: 'DELETE' });
+    return { success: true, ...data };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+// Tedarikçi Kategori Raporları
+ipcMain.handle('tedarikci-kategori-rapor-istatistik', async () => {
+  try {
+    const data = await ihaleFetch('/api/TedarikciKategori/raporlar/genel-istatistik');
+    return { success: true, ...data };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('tedarikci-kategori-rapor-kategori-ozet', async (event, params) => {
+  try {
+    const qs = new URLSearchParams();
+    if (params?.tip) qs.set('tip', params.tip);
+    const query = qs.toString();
+    const data = await ihaleFetch(`/api/TedarikciKategori/raporlar/kategori-ozet${query ? '?' + query : ''}`);
+    return { success: true, ...data };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('tedarikci-kategori-rapor-tip-dagilimi', async () => {
+  try {
+    const data = await ihaleFetch('/api/TedarikciKategori/raporlar/tip-dagilimi');
+    return { success: true, ...data };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('tedarikci-kategori-rapor-tedarikci-profil', async (event, params) => {
+  try {
+    const qs = new URLSearchParams();
+    if (params?.cari_kodu) qs.set('cari_kodu', params.cari_kodu);
+    if (params?.unvan) qs.set('unvan', params.unvan);
+    const query = qs.toString();
+    const data = await ihaleFetch(`/api/TedarikciKategori/raporlar/tedarikci-profil${query ? '?' + query : ''}`);
+    return { success: true, ...data };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('tedarikci-kategori-rapor-eksik-bilgi', async () => {
+  try {
+    const data = await ihaleFetch('/api/TedarikciKategori/raporlar/eksik-bilgi');
+    return { success: true, ...data };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('tedarikci-kategori-rapor-coklu-kategori', async () => {
+  try {
+    const data = await ihaleFetch('/api/TedarikciKategori/raporlar/coklu-kategori');
+    return { success: true, ...data };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('tedarikci-kategori-rapor-kategori-karsilastirma', async (event, params) => {
+  try {
+    const qs = new URLSearchParams();
+    if (params?.kategoriler) qs.set('kategoriler', params.kategoriler);
+    const data = await ihaleFetch(`/api/TedarikciKategori/raporlar/kategori-karsilastirma?${qs.toString()}`);
+    return { success: true, ...data };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('tedarikci-kategori-rapor-kategori-listesi', async () => {
+  try {
+    const data = await ihaleFetch('/api/TedarikciKategori/raporlar/kategori-listesi');
+    return { success: true, ...data };
+  } catch (e) { return { success: false, error: e.message }; }
 });

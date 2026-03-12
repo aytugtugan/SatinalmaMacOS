@@ -1,6 +1,6 @@
 {
   "name": "satinalma-rapor",
-  "version": "1.0.7",
+  "version": "1.0.11",
   "description": "Satın Alma Rapor Uygulaması",
   "main": "main.js",
   "scripts": {
@@ -17,8 +17,10 @@
       "output": "C:\\Users\\acemoglu\\Desktop"
     },
     "forceCodeSigning": false,
+    "artifactName": "Satin.Alma.Rapor.Setup.${version}.exe",
     "win": {
       "target": "nsis",
+      "icon": "assets/icon.ico",
       "signAndEditExecutable": false
     },
     "nsis": {
@@ -27,7 +29,9 @@
       "allowElevation": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Satin Alma Rapor"
+      "shortcutName": "Satin Alma Rapor",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico"
     },
     "publish": [
       {

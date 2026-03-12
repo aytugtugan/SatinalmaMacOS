@@ -6,9 +6,13 @@ import {
   TeamOutlined,
   FundOutlined,
   DatabaseOutlined,
+  TrophyOutlined,
+  BarChartOutlined,
   DownloadOutlined,
   CheckOutlined,
   LoadingOutlined,
+  TagsOutlined,
+  PieChartFilled,
 } from '@ant-design/icons';
 
 import logoImgInline from '../../assets/logo.jpg?inline';
@@ -20,6 +24,10 @@ const menuItems = [
   { key: 'tedarikci', icon: <TeamOutlined />, label: 'Tedarikçi Analizi' },
   { key: 'finansal', icon: <FundOutlined />, label: 'Finansal Analiz' },
   { key: 'detay', icon: <DatabaseOutlined />, label: 'Detaylı Rapor' },
+  { key: 'ihale', icon: <TrophyOutlined />, label: 'İhale Yönetimi' },
+  { key: 'ihaleRapor', icon: <BarChartOutlined />, label: 'İhale Raporları' },
+  { key: 'tedarikciKategori', icon: <TagsOutlined />, label: 'Tedarikçi Kategori' },
+  { key: 'tedarikciKategoriRapor', icon: <PieChartFilled />, label: 'Kategori Raporları' },
 ];
 
 const Sidebar = ({ currentPage, setCurrentPage, updateStatus, downloadPercent, onCheckUpdate, onRestartUpdate }) => {
@@ -62,7 +70,16 @@ const Sidebar = ({ currentPage, setCurrentPage, updateStatus, downloadPercent, o
         ))}
       </nav>
       <div className="sidebar-update-section">
-        {updateStatus === 'ready' ? (
+        {updateStatus === 'current' ? (
+          <div className="update-current">
+            <CheckOutlined style={{ color: '#52c41a', marginRight: 6 }} />
+            <span>Uygulama güncel</span>
+          </div>
+        ) : updateStatus === 'error' ? (
+          <div className="update-error-msg">
+            <span>Bağlantı hatası, tekrar deneyin</span>
+          </div>
+        ) : updateStatus === 'ready' ? (
           <div className="update-ready">
             <div className="update-label">✓ Güncelleme Hazır!</div>
             <button className="update-action-btn" onClick={onRestartUpdate} title="Uygulamayı yeniden başlat">
@@ -90,7 +107,7 @@ const Sidebar = ({ currentPage, setCurrentPage, updateStatus, downloadPercent, o
         )}
       </div>
       <div className="sidebar-footer">
-        v1.0.7 — Enterprise
+        v1.0.10 — Enterprise
       </div>
     </aside>
   );

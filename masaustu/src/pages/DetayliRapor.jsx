@@ -58,13 +58,21 @@ const DetayliRapor = ({ data, selectedIsyeri, columns }) => {
     });
   }, [data, columns]);
 
-  // Filtreleme - isyeri filtresi dahil
+  // Filtreleme - ambar filtresi dahil
   const filteredData = useMemo(() => {
     let result = normalizedData || [];
 
-    // Isyeri filtresi
-    if (selectedIsyeri && selectedIsyeri !== 'all' && C.ISYERI) {
-      result = result.filter(item => item['ISYERI'] === selectedIsyeri);
+    // Ambar filtresi (KOZLU YAĞ sanal ambar dahil)
+    if (selectedIsyeri && selectedIsyeri !== 'all') {
+      const norm = (s) => (s || '').toUpperCase().replace(/\s+/g, ' ').trim();
+      const sel = norm(selectedIsyeri);
+      if (sel === 'KOZLU YAĞ' || sel === 'KOZLU YAG') {
+        result = result.filter(item => norm(item['AMBAR']) === 'AKHİSAR' && String(item['FIRMA_NUMARASI']) === '400');
+      } else if (sel === 'AKHİSAR') {
+        result = result.filter(item => norm(item['AMBAR']) === 'AKHİSAR' && String(item['FIRMA_NUMARASI']) !== '400');
+      } else {
+        result = result.filter(item => norm(item['AMBAR']) === sel);
+      }
     }
 
     // Metin aramasi
