@@ -32,6 +32,14 @@ const fmtShort = (val) => {
   return val.toLocaleString('tr-TR');
 };
 
+const darkenHex = (hex, a = 50) => {
+  if (!hex || !hex.startsWith('#')) return hex;
+  const r = Math.max(0, parseInt(hex.slice(1, 3), 16) - a);
+  const g = Math.max(0, parseInt(hex.slice(3, 5), 16) - a);
+  const b = Math.max(0, parseInt(hex.slice(5, 7), 16) - a);
+  return `rgb(${r},${g},${b})`;
+};
+
 const ChartTooltip = ({ active, payload, label, formatter }) => {
   if (!active || !payload?.length) return null;
   return (
@@ -143,16 +151,27 @@ const RenderChart = ({ data, mode, dataKey, nameKey, height = 280 }) => {
 
   if (mode === 'pie') {
     const pieTotal = pieData.reduce((s, d) => s + (parseFloat(d[dataKey]) || 0), 0);
+    const pieH = Math.max(height + 40, 320);
     return (
       <>
-        <ResponsiveContainer width="100%" height={height}>
-          <PieChart>
-            <Pie data={pieData} dataKey={dataKey} nameKey={nameKey} cx="50%" cy="50%" outerRadius={100} innerRadius={0} paddingAngle={1}
-              label={({ name, percent }) => percent > 0.04 ? `${name ? String(name).substring(0, 12) : ''} ${(percent * 100).toFixed(0)}%` : ''} labelLine={true}>
-              {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="#fff" strokeWidth={1} />)}
+        <ResponsiveContainer width="100%" height={pieH}>
+          <PieChart margin={{ top: 20, right: 70, bottom: 30, left: 70 }}>
+            {/* 3D derinlik katmanı */}
+            <Pie data={pieData} dataKey={dataKey} nameKey={nameKey}
+              cx="50%" cy="54%" outerRadius={88} innerRadius={0} paddingAngle={0}
+              isAnimationActive={false} label={false} labelLine={false} legendType="none"
+            >
+              {pieData.map((_, i) => <Cell key={i} fill={darkenHex(COLORS[i % COLORS.length])} stroke="none" />)}
+            </Pie>
+            {/* Yüzey katmanı */}
+            <Pie data={pieData} dataKey={dataKey} nameKey={nameKey}
+              cx="50%" cy="46%" outerRadius={88} innerRadius={0} paddingAngle={0}
+              label={({ value, percent }) => percent > 0.03 ? `${fmtShort(value)}; ${(percent * 100).toFixed(0)}%` : ''}
+              labelLine={{ stroke: '#64748b', strokeWidth: 1 }}
+            >
+              {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="#fff" strokeWidth={2} />)}
             </Pie>
             <Tooltip content={<ChartTooltip formatter={fmtShort} />} />
-            <Legend />
           </PieChart>
         </ResponsiveContainer>
         <div style={{ fontSize: 12, padding: '4px 8px 8px', borderTop: '1px solid #f1f5f9', marginTop: 4 }}>

@@ -33,6 +33,14 @@ const COLORS = [
   '#6366f1', // Indigo
 ];
 
+const darkenHex = (hex, a = 50) => {
+  if (!hex || !hex.startsWith('#')) return hex;
+  const r = Math.max(0, parseInt(hex.slice(1, 3), 16) - a);
+  const g = Math.max(0, parseInt(hex.slice(3, 5), 16) - a);
+  const b = Math.max(0, parseInt(hex.slice(5, 7), 16) - a);
+  return `rgb(${r},${g},${b})`;
+};
+
 const CHART_TYPES = [
   { key: 'bar', icon: <BarChartOutlined />, label: 'Cubuk Grafik' },
   { key: 'pie', icon: <PieChartOutlined />, label: 'Pasta Grafik' },
@@ -232,38 +240,54 @@ const SwitchableChart = ({
     const formatter = valueFormatter || formatNumber;
 
     switch (effectiveType) {
-      case 'pie':
+      case 'pie': {
+        const pieH = Math.max(effectiveHeight + 40, 320);
         return (
-          <ResponsiveContainer width="100%" height={effectiveHeight}>
-            <PieChart>
+          <ResponsiveContainer width="100%" height={pieH}>
+            <PieChart margin={{ top: 20, right: 70, bottom: 30, left: 70 }}>
+              {/* 3D derinlik katmanı */}
               <Pie
                 data={sortedData}
                 dataKey={dataKey}
                 nameKey={nameKey}
                 cx="50%"
-                cy="50%"
-                outerRadius={100}
+                cy="54%"
+                outerRadius={88}
                 innerRadius={0}
-                paddingAngle={1}
-                label={({ name, percent }) =>
-                  percent > 0.04 ? `${name ? name.substring(0, 12) : ''} ${(percent * 100).toFixed(0)}%` : ''
-                }
-                labelLine={true}
+                paddingAngle={0}
+                isAnimationActive={false}
+                label={false}
+                labelLine={false}
+                legendType="none"
               >
-                {sortedData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={COLORS[index % COLORS.length]}
-                    stroke="#fff"
-                    strokeWidth={1}
-                  />
+                {sortedData.map((_, index) => (
+                  <Cell key={index} fill={darkenHex(COLORS[index % COLORS.length])} stroke="none" />
+                ))}
+              </Pie>
+              {/* Yüzey katmanı */}
+              <Pie
+                data={sortedData}
+                dataKey={dataKey}
+                nameKey={nameKey}
+                cx="50%"
+                cy="46%"
+                outerRadius={88}
+                innerRadius={0}
+                paddingAngle={0}
+                label={({ value, percent }) =>
+                  percent > 0.03 ? `${formatter(value)}; ${(percent * 100).toFixed(0)}%` : ''
+                }
+                labelLine={{ stroke: '#64748b', strokeWidth: 1 }}
+              >
+                {sortedData.map((_, index) => (
+                  <Cell key={index} fill={COLORS[index % COLORS.length]} stroke="#fff" strokeWidth={2} />
                 ))}
               </Pie>
               <Tooltip content={<CustomTooltip valueFormatter={formatter} />} />
-              <Legend content={<CustomLegend />} />
             </PieChart>
           </ResponsiveContainer>
         );
+      }
 
       case 'horizontal':
         return (

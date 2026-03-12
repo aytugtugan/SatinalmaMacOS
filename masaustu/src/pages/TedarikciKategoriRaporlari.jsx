@@ -20,6 +20,14 @@ const COLORS = [
   '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#6366f1',
 ];
 
+const darkenHex = (hex, a = 50) => {
+  if (!hex || !hex.startsWith('#')) return hex;
+  const r = Math.max(0, parseInt(hex.slice(1, 3), 16) - a);
+  const g = Math.max(0, parseInt(hex.slice(3, 5), 16) - a);
+  const b = Math.max(0, parseInt(hex.slice(5, 7), 16) - a);
+  return `rgb(${r},${g},${b})`;
+};
+
 const tipLabel = (v) => {
   if (!v) return '-';
   if (v === 'D') return 'Direkt';
@@ -93,14 +101,24 @@ const OzetTab = ({ istatistik, istatistikErr, tipData, tipErr, kategoriOzet, kat
         <ChartCard title="Tip Dağılımı" icon={<PieChartFilled />}>
           {tipErr ? <ErrorBox message={tipErr} /> : tipData?.length > 0 ? (
             <>
-              <ResponsiveContainer width="100%" height={260}>
-                <PieChart>
-                  <Pie data={tipData} dataKey="kayit_sayisi" nameKey="tip" cx="50%" cy="50%" outerRadius={90} innerRadius={50} paddingAngle={0}
-                    label={({ name, percent }) => percent > 0.04 ? `${name} ${(percent * 100).toFixed(0)}%` : ''} labelLine={true}>
-                    {tipData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="none" strokeWidth={0} />)}
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart margin={{ top: 20, right: 70, bottom: 30, left: 70 }}>
+                  {/* 3D derinlik */}
+                  <Pie data={tipData} dataKey="kayit_sayisi" nameKey="tip"
+                    cx="50%" cy="54%" outerRadius={80} innerRadius={0} paddingAngle={0}
+                    isAnimationActive={false} label={false} labelLine={false} legendType="none"
+                  >
+                    {tipData.map((_, i) => <Cell key={i} fill={darkenHex(COLORS[i % COLORS.length])} stroke="none" />)}
+                  </Pie>
+                  {/* Yüzey */}
+                  <Pie data={tipData} dataKey="kayit_sayisi" nameKey="tip"
+                    cx="50%" cy="46%" outerRadius={80} innerRadius={0} paddingAngle={0}
+                    label={({ value, percent }) => percent > 0.03 ? `${value}; ${(percent * 100).toFixed(0)}%` : ''}
+                    labelLine={{ stroke: '#64748b', strokeWidth: 1 }}
+                  >
+                    {tipData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="#fff" strokeWidth={2} />)}
                   </Pie>
                   <Tooltip content={<ChartTooltip />} />
-                  <Legend />
                 </PieChart>
               </ResponsiveContainer>
               <div style={{ fontSize: 13, marginTop: 8 }}>
@@ -138,14 +156,24 @@ const OzetTab = ({ istatistik, istatistikErr, tipData, tipErr, kategoriOzet, kat
           {kategoriOzetErr ? <ErrorBox message={kategoriOzetErr} /> : kategoriOzet?.length > 0 ? (
             chartMode === 'pie' ? (
               <>
-                <ResponsiveContainer width="100%" height={280}>
-                  <PieChart>
-                    <Pie data={kategoriOzet.slice(0, 10)} dataKey="tedarikci_sayisi" nameKey="kategori" cx="50%" cy="50%" outerRadius={90} innerRadius={50} paddingAngle={0}
-                      label={({ name, percent }) => percent > 0.04 ? `${name ? String(name).substring(0, 10) : ''} ${(percent * 100).toFixed(0)}%` : ''} labelLine={true}>
-                      {kategoriOzet.slice(0, 10).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="none" strokeWidth={0} />)}
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart margin={{ top: 20, right: 70, bottom: 30, left: 70 }}>
+                    {/* 3D derinlik */}
+                    <Pie data={kategoriOzet.slice(0, 10)} dataKey="tedarikci_sayisi" nameKey="kategori"
+                      cx="50%" cy="54%" outerRadius={80} innerRadius={0} paddingAngle={0}
+                      isAnimationActive={false} label={false} labelLine={false} legendType="none"
+                    >
+                      {kategoriOzet.slice(0, 10).map((_, i) => <Cell key={i} fill={darkenHex(COLORS[i % COLORS.length])} stroke="none" />)}
+                    </Pie>
+                    {/* Yüzey */}
+                    <Pie data={kategoriOzet.slice(0, 10)} dataKey="tedarikci_sayisi" nameKey="kategori"
+                      cx="50%" cy="46%" outerRadius={80} innerRadius={0} paddingAngle={0}
+                      label={({ value, percent }) => percent > 0.03 ? `${value}; ${(percent * 100).toFixed(0)}%` : ''}
+                      labelLine={{ stroke: '#64748b', strokeWidth: 1 }}
+                    >
+                      {kategoriOzet.slice(0, 10).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="#fff" strokeWidth={2} />)}
                     </Pie>
                     <Tooltip content={<ChartTooltip />} />
-                    <Legend />
                   </PieChart>
                 </ResponsiveContainer>
                 <div style={{ fontSize: 12, padding: '4px 8px 8px', borderTop: '1px solid #f1f5f9', marginTop: 4 }}>
