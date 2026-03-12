@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  BarChart, Bar, PieChart, Pie,
+  BarChart, Bar, PieChart, Pie, Label,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend,
 } from 'recharts';
 import {
@@ -32,12 +32,18 @@ const fmtShort = (val) => {
   return val.toLocaleString('tr-TR');
 };
 
-const darkenHex = (hex, a = 50) => {
-  if (!hex || !hex.startsWith('#')) return hex;
-  const r = Math.max(0, parseInt(hex.slice(1, 3), 16) - a);
-  const g = Math.max(0, parseInt(hex.slice(3, 5), 16) - a);
-  const b = Math.max(0, parseInt(hex.slice(5, 7), 16) - a);
-  return `rgb(${r},${g},${b})`;
+const RADIAN = Math.PI / 180;
+const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+  if (percent < 0.05) return null;
+  const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + r * Math.cos(-midAngle * RADIAN);
+  const y = cy + r * Math.sin(-midAngle * RADIAN);
+  return (
+    <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central"
+      style={{ fontSize: 12, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
+      {(percent * 100).toFixed(0)}%
+    </text>
+  );
 };
 
 const ChartTooltip = ({ active, payload, label, formatter }) => {
@@ -151,42 +157,43 @@ const RenderChart = ({ data, mode, dataKey, nameKey, height = 280 }) => {
 
   if (mode === 'pie') {
     const pieTotal = pieData.reduce((s, d) => s + (parseFloat(d[dataKey]) || 0), 0);
-    const pieH = Math.max(height + 40, 320);
     return (
       <>
-        <ResponsiveContainer width="100%" height={pieH}>
-          <PieChart margin={{ top: 20, right: 70, bottom: 30, left: 70 }}>
-            {/* 3D derinlik katmanı */}
-            <Pie data={pieData} dataKey={dataKey} nameKey={nameKey}
-              cx="50%" cy="54%" outerRadius={88} innerRadius={0} paddingAngle={0}
-              isAnimationActive={false} label={false} labelLine={false} legendType="none"
-            >
-              {pieData.map((_, i) => <Cell key={i} fill={darkenHex(COLORS[i % COLORS.length])} stroke="none" />)}
-            </Pie>
-            {/* Yüzey katmanı */}
-            <Pie data={pieData} dataKey={dataKey} nameKey={nameKey}
-              cx="50%" cy="46%" outerRadius={88} innerRadius={0} paddingAngle={0}
-              label={({ value, percent }) => percent > 0.03 ? `${fmtCurrency(value)}; ${(percent * 100).toFixed(0)}%` : ''}
-              labelLine={{ stroke: '#64748b', strokeWidth: 1 }}
-            >
-              {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="#fff" strokeWidth={2} />)}
-            </Pie>
-            <Tooltip content={<ChartTooltip formatter={fmtShort} />} />
-          </PieChart>
-        </ResponsiveContainer>
-        <div style={{ fontSize: 12, padding: '4px 8px 8px', borderTop: '1px solid #f1f5f9', marginTop: 4 }}>
+        <div style={{ position: 'relative' }}>
+          <ResponsiveContainer width="100%" height={280}>
+            <PieChart>
+              <Pie data={pieData} dataKey={dataKey} nameKey={nameKey}
+                cx="50%" cy="50%"
+                outerRadius={105} innerRadius={62}
+                paddingAngle={3} startAngle={90} endAngle={-270}
+                labelLine={false} label={renderPieLabel}
+              >
+                {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="#fff" strokeWidth={2} />)}
+                <Label content={({ viewBox: { cx, cy } }) => (
+                  <g>
+                    <text x={cx} y={cy - 8} textAnchor="middle" fill="#1e293b" fontSize={20} fontWeight={800}>{pieData.length}</text>
+                    <text x={cx} y={cy + 10} textAnchor="middle" fill="#94a3b8" fontSize={11}>grup</text>
+                  </g>
+                )} position="center" />
+              </Pie>
+              <Tooltip content={<ChartTooltip formatter={fmtCurrency} />} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <div style={{ padding: '8px 12px 4px', borderTop: '1px solid #f1f5f9' }}>
           {pieData.map((item, i) => {
             const val = parseFloat(item[dataKey]) || 0;
             const pct = pieTotal > 0 ? (val / pieTotal) * 100 : 0;
             return (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: i < pieData.length - 1 ? '1px solid #f8fafc' : 'none' }}>
-                <div style={{ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: COLORS[i % COLORS.length] }} />
-                <span style={{ flex: 1, fontSize: 11, color: '#44474a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item[nameKey]}</span>
-                <div style={{ width: 80, background: '#f1f5f9', borderRadius: 4, height: 6, flexShrink: 0, overflow: 'hidden' }}>
-                  <div style={{ width: `${pct}%`, height: '100%', background: COLORS[i % COLORS.length], borderRadius: 4 }} />
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: i < pieData.length - 1 ? '1px solid #f8fafc' : 'none' }}>
+                <span style={{ fontSize: 11, color: '#94a3b8', width: 14, textAlign: 'right', flexShrink: 0, fontWeight: 600 }}>{i + 1}</span>
+                <span style={{ width: 12, height: 12, borderRadius: 3, background: COLORS[i % COLORS.length], flexShrink: 0 }} />
+                <span style={{ flex: 1, fontSize: 12, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{item[nameKey]}</span>
+                <div style={{ width: 72, background: '#f1f5f9', borderRadius: 10, height: 6, flexShrink: 0, overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, height: '100%', background: COLORS[i % COLORS.length], borderRadius: 10 }} />
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#3b82f6', width: 38, textAlign: 'right', flexShrink: 0 }}>{pct.toFixed(1)}%</span>
-                <span style={{ fontSize: 11, color: '#6a6d70', width: 90, textAlign: 'right', flexShrink: 0 }}>{fmtShort(val)}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: COLORS[i % COLORS.length], width: 36, textAlign: 'right', flexShrink: 0 }}>{pct.toFixed(0)}%</span>
+                <span style={{ fontSize: 11, color: '#64748b', width: 72, textAlign: 'right', flexShrink: 0 }}>{fmtShort(val)}</span>
               </div>
             );
           })}

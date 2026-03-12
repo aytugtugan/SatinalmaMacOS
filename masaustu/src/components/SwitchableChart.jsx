@@ -4,6 +4,7 @@ import {
   Bar,
   PieChart,
   Pie,
+  Label,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -33,12 +34,18 @@ const COLORS = [
   '#6366f1', // Indigo
 ];
 
-const darkenHex = (hex, a = 50) => {
-  if (!hex || !hex.startsWith('#')) return hex;
-  const r = Math.max(0, parseInt(hex.slice(1, 3), 16) - a);
-  const g = Math.max(0, parseInt(hex.slice(3, 5), 16) - a);
-  const b = Math.max(0, parseInt(hex.slice(5, 7), 16) - a);
-  return `rgb(${r},${g},${b})`;
+const RADIAN = Math.PI / 180;
+const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+  if (percent < 0.05) return null;
+  const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + r * Math.cos(-midAngle * RADIAN);
+  const y = cy + r * Math.sin(-midAngle * RADIAN);
+  return (
+    <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central"
+      style={{ fontSize: 12, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
+      {(percent * 100).toFixed(0)}%
+    </text>
+  );
 };
 
 const CHART_TYPES = [
@@ -241,51 +248,52 @@ const SwitchableChart = ({
 
     switch (effectiveType) {
       case 'pie': {
-        const pieH = Math.max(effectiveHeight + 40, 320);
+        const pieTotal = sortedData.reduce((s, d) => s + (toNumber(d[dataKey]) || 0), 0);
         return (
-          <ResponsiveContainer width="100%" height={pieH}>
-            <PieChart margin={{ top: 20, right: 70, bottom: 30, left: 70 }}>
-              {/* 3D derinlik katmanı */}
-              <Pie
-                data={sortedData}
-                dataKey={dataKey}
-                nameKey={nameKey}
-                cx="50%"
-                cy="54%"
-                outerRadius={88}
-                innerRadius={0}
-                paddingAngle={0}
-                isAnimationActive={false}
-                label={false}
-                labelLine={false}
-                legendType="none"
-              >
-                {sortedData.map((_, index) => (
-                  <Cell key={index} fill={darkenHex(COLORS[index % COLORS.length])} stroke="none" />
-                ))}
-              </Pie>
-              {/* Yüzey katmanı */}
-              <Pie
-                data={sortedData}
-                dataKey={dataKey}
-                nameKey={nameKey}
-                cx="50%"
-                cy="46%"
-                outerRadius={88}
-                innerRadius={0}
-                paddingAngle={0}
-                label={({ value, percent }) =>
-                  percent > 0.03 ? `${formatter(value)}; ${(percent * 100).toFixed(0)}%` : ''
-                }
-                labelLine={{ stroke: '#64748b', strokeWidth: 1 }}
-              >
-                {sortedData.map((_, index) => (
-                  <Cell key={index} fill={COLORS[index % COLORS.length]} stroke="#fff" strokeWidth={2} />
-                ))}
-              </Pie>
-              <Tooltip content={<CustomTooltip valueFormatter={formatter} />} />
-            </PieChart>
-          </ResponsiveContainer>
+          <>
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie
+                  data={sortedData}
+                  dataKey={dataKey}
+                  nameKey={nameKey}
+                  cx="50%" cy="50%"
+                  outerRadius={105} innerRadius={62}
+                  paddingAngle={3} startAngle={90} endAngle={-270}
+                  labelLine={false} label={renderPieLabel}
+                >
+                  {sortedData.map((_, index) => (
+                    <Cell key={index} fill={COLORS[index % COLORS.length]} stroke="#fff" strokeWidth={2} />
+                  ))}
+                  <Label content={({ viewBox: { cx, cy } }) => (
+                    <g>
+                      <text x={cx} y={cy - 8} textAnchor="middle" fill="#1e293b" fontSize={20} fontWeight={800}>{sortedData.length}</text>
+                      <text x={cx} y={cy + 10} textAnchor="middle" fill="#94a3b8" fontSize={11}>grup</text>
+                    </g>
+                  )} position="center" />
+                </Pie>
+                <Tooltip content={<CustomTooltip valueFormatter={formatter} />} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{ padding: '8px 12px 4px', borderTop: '1px solid #f1f5f9' }}>
+              {sortedData.map((item, i) => {
+                const val = toNumber(item[dataKey]);
+                const pct = pieTotal > 0 ? (val / pieTotal) * 100 : 0;
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: i < sortedData.length - 1 ? '1px solid #f8fafc' : 'none' }}>
+                    <span style={{ fontSize: 11, color: '#94a3b8', width: 14, textAlign: 'right', flexShrink: 0, fontWeight: 600 }}>{i + 1}</span>
+                    <span style={{ width: 12, height: 12, borderRadius: 3, background: COLORS[i % COLORS.length], flexShrink: 0 }} />
+                    <span style={{ flex: 1, fontSize: 12, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{item[nameKey]}</span>
+                    <div style={{ width: 72, background: '#f1f5f9', borderRadius: 10, height: 6, flexShrink: 0, overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, height: '100%', background: COLORS[i % COLORS.length], borderRadius: 10 }} />
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: COLORS[i % COLORS.length], width: 36, textAlign: 'right', flexShrink: 0 }}>{pct.toFixed(0)}%</span>
+                    <span style={{ fontSize: 11, color: '#64748b', width: 72, textAlign: 'right', flexShrink: 0 }}>{formatter(val)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         );
       }
 
