@@ -81,8 +81,14 @@ const App = () => {
       try {
         const result = await window.api.checkForUpdates();
         console.log('Güncelleme kontrol sonucu:', result);
+        if (result && !result.success) {
+          setUpdateStatus('error');
+          setTimeout(() => setUpdateStatus(null), 5000);
+        }
       } catch (err) {
         console.error('Güncelleme kontrol hatası:', err);
+        setUpdateStatus('error');
+        setTimeout(() => setUpdateStatus(null), 5000);
       }
     }
   };

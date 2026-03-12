@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, Menu, dialog, shell } = require('electron')
 const { autoUpdater } = require('electron-updater');
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.allowPrerelease = false;
 // Public repo - token gerekmez
 // Guncelleme logunu dosyaya yaz
 const log = require('electron-log');
@@ -167,7 +168,9 @@ ipcMain.handle('check-for-updates', async () => {
     console.log('Güncelleme kontrolü sonucu:', result);
     return { success: true, data: result };
   } catch (error) {
-    console.error('Güncelleme kontrol hatası:', error);
+    console.error('Güncelleme kontrol hatası:', error.message);
+    // update-error event zaten autoUpdater.on('error') tarafından gönderilir
+    // Burada da güvenlik olarak false döndür
     return { success: false, error: error.message };
   }
 });

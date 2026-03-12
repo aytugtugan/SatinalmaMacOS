@@ -21,16 +21,40 @@ const COLORS = [
 ];
 
 const RADIAN = Math.PI / 180;
-const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
-  if (percent < 0.05) return null;
-  const r = innerRadius + (outerRadius - innerRadius) * 0.5;
-  const x = cx + r * Math.cos(-midAngle * RADIAN);
-  const y = cy + r * Math.sin(-midAngle * RADIAN);
+const fmtShort = (val) => {
+  if (!val && val !== 0) return '0';
+  if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
+  if (val >= 1000) return (val / 1000).toFixed(0) + 'K';
+  return val.toLocaleString('tr-TR');
+};
+const renderCombinedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, value }) => {
+  if (percent < 0.03) return null;
+  // İçeride: değer (sayı)
+  const ri = innerRadius + (outerRadius - innerRadius) * 0.55;
+  const xi = cx + ri * Math.cos(-midAngle * RADIAN);
+  const yi = cy + ri * Math.sin(-midAngle * RADIAN);
+  // Dışarıda: % etiketi ve çizgi
+  const ro1 = outerRadius + 8;
+  const ro2 = outerRadius + 26;
+  const x1 = cx + ro1 * Math.cos(-midAngle * RADIAN);
+  const y1 = cy + ro1 * Math.sin(-midAngle * RADIAN);
+  const x2 = cx + ro2 * Math.cos(-midAngle * RADIAN);
+  const y2 = cy + ro2 * Math.sin(-midAngle * RADIAN);
+  const anchor = x2 > cx ? 'start' : 'end';
   return (
-    <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central"
-      style={{ fontSize: 12, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
-      {(percent * 100).toFixed(0)}%
-    </text>
+    <g>
+      {percent > 0.07 && (
+        <text x={xi} y={yi} fill="#fff" textAnchor="middle" dominantBaseline="central"
+          style={{ fontSize: 11, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
+          {fmtShort(value)}
+        </text>
+      )}
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#94a3b8" strokeWidth={1} />
+      <text x={x2 + (anchor === 'start' ? 4 : -4)} y={y2} fill="#374151"
+        textAnchor={anchor} dominantBaseline="central" style={{ fontSize: 11, fontWeight: 700 }}>
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    </g>
   );
 };
 
@@ -107,12 +131,12 @@ const OzetTab = ({ istatistik, istatistikErr, tipData, tipErr, kategoriOzet, kat
         <ChartCard title="Tip Dağılımı" icon={<PieChartFilled />}>
           {tipErr ? <ErrorBox message={tipErr} /> : tipData?.length > 0 ? (
             <>
-              <ResponsiveContainer width="100%" height={260}>
-                <PieChart>
+              <ResponsiveContainer width="100%" height={320}>
+                <PieChart margin={{ top: 20, right: 60, bottom: 20, left: 60 }}>
                   <Pie data={tipData} dataKey="kayit_sayisi" nameKey="tip"
-                    cx="50%" cy="50%" outerRadius={100} innerRadius={58}
+                    cx="50%" cy="50%" outerRadius={80} innerRadius={50}
                     paddingAngle={3} startAngle={90} endAngle={-270}
-                    labelLine={false} label={renderPieLabel}
+                    labelLine={false} label={renderCombinedLabel}
                   >
                     {tipData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="#fff" strokeWidth={2} />)}
                     <Label content={({ viewBox: { cx, cy } }) => (
@@ -125,14 +149,13 @@ const OzetTab = ({ istatistik, istatistikErr, tipData, tipErr, kategoriOzet, kat
                   <Tooltip content={<ChartTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
-              <div style={{ fontSize: 13, marginTop: 8 }}>
+              <div style={{ padding: '8px 12px 4px', borderTop: '1px solid #f1f5f9' }}>
                 {tipData.map((t, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f8fafc' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: COLORS[i % COLORS.length], display: 'inline-block' }} />
-                      Tip {t.tip}
-                    </span>
-                    <span><strong>{t.kayit_sayisi}</strong> kayıt ({t.yuzde}%)</span>
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: i < tipData.length - 1 ? '1px solid #f8fafc' : 'none' }}>
+                    <span style={{ fontSize: 11, color: '#94a3b8', width: 14, textAlign: 'right', flexShrink: 0, fontWeight: 600 }}>{i + 1}</span>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: COLORS[i % COLORS.length], flexShrink: 0 }} />
+                    <span style={{ flex: 1, fontSize: 12, color: '#1e293b', fontWeight: 500 }}>Tip {tipLabel(t.tip)}</span>
+                    <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textAlign: 'right', flexShrink: 0 }}>{t.kayit_sayisi} kayıt</span>
                   </div>
                 ))}
               </div>
@@ -160,12 +183,12 @@ const OzetTab = ({ istatistik, istatistikErr, tipData, tipErr, kategoriOzet, kat
           {kategoriOzetErr ? <ErrorBox message={kategoriOzetErr} /> : kategoriOzet?.length > 0 ? (
             chartMode === 'pie' ? (
               <>
-                <ResponsiveContainer width="100%" height={260}>
-                  <PieChart>
+                <ResponsiveContainer width="100%" height={320}>
+                  <PieChart margin={{ top: 20, right: 60, bottom: 20, left: 60 }}>
                     <Pie data={kategoriOzet.slice(0, 10)} dataKey="tedarikci_sayisi" nameKey="kategori"
-                      cx="50%" cy="50%" outerRadius={100} innerRadius={58}
+                      cx="50%" cy="50%" outerRadius={80} innerRadius={50}
                       paddingAngle={3} startAngle={90} endAngle={-270}
-                      labelLine={false} label={renderPieLabel}
+                      labelLine={false} label={renderCombinedLabel}
                     >
                       {kategoriOzet.slice(0, 10).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="#fff" strokeWidth={2} />)}
                       <Label content={({ viewBox: { cx, cy } }) => (
@@ -178,25 +201,15 @@ const OzetTab = ({ istatistik, istatistikErr, tipData, tipErr, kategoriOzet, kat
                     <Tooltip content={<ChartTooltip />} />
                   </PieChart>
                 </ResponsiveContainer>
-                <div style={{ fontSize: 12, padding: '4px 8px 8px', borderTop: '1px solid #f1f5f9', marginTop: 4 }}>
-                  {(() => {
-                    const d = kategoriOzet.slice(0, 10);
-                    const total = d.reduce((s, x) => s + (x.tedarikci_sayisi || 0), 0);
-                    return d.map((item, i) => {
-                      const pct = total > 0 ? (item.tedarikci_sayisi / total) * 100 : 0;
-                      return (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: i < d.length - 1 ? '1px solid #f8fafc' : 'none' }}>
-                          <div style={{ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: COLORS[i % COLORS.length] }} />
-                          <span style={{ flex: 1, fontSize: 11, color: '#44474a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.kategori}</span>
-                          <div style={{ width: 80, background: '#f1f5f9', borderRadius: 4, height: 6, flexShrink: 0, overflow: 'hidden' }}>
-                            <div style={{ width: `${pct}%`, height: '100%', background: COLORS[i % COLORS.length], borderRadius: 4 }} />
-                          </div>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: '#3b82f6', width: 38, textAlign: 'right', flexShrink: 0 }}>{pct.toFixed(1)}%</span>
-                          <span style={{ fontSize: 11, color: '#6a6d70', width: 40, textAlign: 'right', flexShrink: 0 }}>{item.tedarikci_sayisi}</span>
-                        </div>
-                      );
-                    });
-                  })()}
+                <div style={{ padding: '8px 12px 4px', borderTop: '1px solid #f1f5f9' }}>
+                  {kategoriOzet.slice(0, 10).map((item, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: i < Math.min(kategoriOzet.length, 10) - 1 ? '1px solid #f8fafc' : 'none' }}>
+                      <span style={{ fontSize: 11, color: '#94a3b8', width: 14, textAlign: 'right', flexShrink: 0, fontWeight: 600 }}>{i + 1}</span>
+                      <div style={{ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: COLORS[i % COLORS.length] }} />
+                      <span style={{ flex: 1, fontSize: 11, color: '#1e293b', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.kategori}</span>
+                      <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textAlign: 'right', flexShrink: 0 }}>{item.tedarikci_sayisi}</span>
+                    </div>
+                  ))}
                 </div>
               </>
             ) : (

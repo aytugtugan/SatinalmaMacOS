@@ -33,16 +33,34 @@ const fmtShort = (val) => {
 };
 
 const RADIAN = Math.PI / 180;
-const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
-  if (percent < 0.05) return null;
-  const r = innerRadius + (outerRadius - innerRadius) * 0.5;
-  const x = cx + r * Math.cos(-midAngle * RADIAN);
-  const y = cy + r * Math.sin(-midAngle * RADIAN);
+const renderCombinedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, value }) => {
+  if (percent < 0.03) return null;
+  // İçeride: değer (sayı)
+  const ri = innerRadius + (outerRadius - innerRadius) * 0.55;
+  const xi = cx + ri * Math.cos(-midAngle * RADIAN);
+  const yi = cy + ri * Math.sin(-midAngle * RADIAN);
+  // Dışarıda: % etiketi ve çizgi
+  const ro1 = outerRadius + 8;
+  const ro2 = outerRadius + 26;
+  const x1 = cx + ro1 * Math.cos(-midAngle * RADIAN);
+  const y1 = cy + ro1 * Math.sin(-midAngle * RADIAN);
+  const x2 = cx + ro2 * Math.cos(-midAngle * RADIAN);
+  const y2 = cy + ro2 * Math.sin(-midAngle * RADIAN);
+  const anchor = x2 > cx ? 'start' : 'end';
   return (
-    <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central"
-      style={{ fontSize: 12, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
-      {(percent * 100).toFixed(0)}%
-    </text>
+    <g>
+      {percent > 0.07 && (
+        <text x={xi} y={yi} fill="#fff" textAnchor="middle" dominantBaseline="central"
+          style={{ fontSize: 11, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
+          {fmtShort(value)}
+        </text>
+      )}
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#94a3b8" strokeWidth={1} />
+      <text x={x2 + (anchor === 'start' ? 4 : -4)} y={y2} fill="#374151"
+        textAnchor={anchor} dominantBaseline="central" style={{ fontSize: 11, fontWeight: 700 }}>
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    </g>
   );
 };
 
@@ -160,13 +178,13 @@ const RenderChart = ({ data, mode, dataKey, nameKey, height = 280 }) => {
     return (
       <>
         <div style={{ position: 'relative' }}>
-          <ResponsiveContainer width="100%" height={280}>
-            <PieChart>
+          <ResponsiveContainer width="100%" height={320}>
+            <PieChart margin={{ top: 20, right: 60, bottom: 20, left: 60 }}>
               <Pie data={pieData} dataKey={dataKey} nameKey={nameKey}
                 cx="50%" cy="50%"
-                outerRadius={105} innerRadius={62}
+                outerRadius={80} innerRadius={50}
                 paddingAngle={3} startAngle={90} endAngle={-270}
-                labelLine={false} label={renderPieLabel}
+                labelLine={false} label={renderCombinedLabel}
               >
                 {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="#fff" strokeWidth={2} />)}
                 <Label content={({ viewBox: { cx, cy } }) => (
@@ -183,17 +201,12 @@ const RenderChart = ({ data, mode, dataKey, nameKey, height = 280 }) => {
         <div style={{ padding: '8px 12px 4px', borderTop: '1px solid #f1f5f9' }}>
           {pieData.map((item, i) => {
             const val = parseFloat(item[dataKey]) || 0;
-            const pct = pieTotal > 0 ? (val / pieTotal) * 100 : 0;
             return (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: i < pieData.length - 1 ? '1px solid #f8fafc' : 'none' }}>
                 <span style={{ fontSize: 11, color: '#94a3b8', width: 14, textAlign: 'right', flexShrink: 0, fontWeight: 600 }}>{i + 1}</span>
                 <span style={{ width: 12, height: 12, borderRadius: 3, background: COLORS[i % COLORS.length], flexShrink: 0 }} />
                 <span style={{ flex: 1, fontSize: 12, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{item[nameKey]}</span>
-                <div style={{ width: 72, background: '#f1f5f9', borderRadius: 10, height: 6, flexShrink: 0, overflow: 'hidden' }}>
-                  <div style={{ width: `${pct}%`, height: '100%', background: COLORS[i % COLORS.length], borderRadius: 10 }} />
-                </div>
-                <span style={{ fontSize: 12, fontWeight: 700, color: COLORS[i % COLORS.length], width: 36, textAlign: 'right', flexShrink: 0 }}>{pct.toFixed(0)}%</span>
-                <span style={{ fontSize: 11, color: '#64748b', width: 72, textAlign: 'right', flexShrink: 0 }}>{fmtShort(val)}</span>
+                <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textAlign: 'right', flexShrink: 0 }}>{fmtShort(val)}</span>
               </div>
             );
           })}
