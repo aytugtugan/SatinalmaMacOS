@@ -545,6 +545,19 @@ function calcTedarikci(records) {
     .map(x => ({ ...x, toplam_kazanc_tl: Math.round(x.toplam_kazanc_tl) }));
 }
 
+function calcMasrafMerkezi(records) {
+  const map = {};
+  for (const r of records) {
+    const m = (r.masraf_merkezi || '').trim() || 'Belirtilmemiş';
+    if (!map[m]) map[m] = { masraf_merkezi: m, ihale_sayisi: 0, toplam_kazanc_tl: 0 };
+    map[m].ihale_sayisi++;
+    map[m].toplam_kazanc_tl += (r.kazanc_tutari_tl || 0);
+  }
+  return Object.values(map)
+    .sort((a, b) => b.toplam_kazanc_tl - a.toplam_kazanc_tl)
+    .map(x => ({ ...x, toplam_kazanc_tl: Math.round(x.toplam_kazanc_tl) }));
+}
+
 function calcRekabet(records) {
   const map = {};
   for (const r of records) {
@@ -611,6 +624,18 @@ ipcMain.handle('ihale-rapor-tedarikci', async (event, params) => {
   try {
     const records = filterByParams(await fetchAllIhaleRecords(), params);
     return { success: true, data: calcTedarikci(records) };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('ihale-rapor-masraf-merkezi', async (event, params) => {
+  try {
+    const records = filterByParams(await fetchAllIhaleRecords(), params);
+    const missing = (records || []).filter(r => {
+      const v = (r.masraf_merkezi || r.MASRAF_MERKEZI || '').toString().trim();
+      return !v;
+    }).map(r => ({ siparis_no: r.siparis_numarasi || r.SIPARIS_NO || r.siparisNo || null, talep_no: r.talep_no || r.TALEP_NO || null, toplam: r.kazanc_tutari_tl || r.TOPLAM || null }));
+    if (missing.length) console.log('Masraf merkezi eksik olan kayıtlar:', missing);
+    return { success: true, data: calcMasrafMerkezi(records), missingRecords: missing };
   } catch (e) { return { success: false, error: e.message }; }
 });
 

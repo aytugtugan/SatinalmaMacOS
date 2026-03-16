@@ -18,6 +18,8 @@ import {
   PieChartOutlined,
   MenuOutlined,
   InboxOutlined,
+  ExpandOutlined,
+  CloseOutlined,
 } from '@ant-design/icons';
 
 // Premium color palette
@@ -35,46 +37,48 @@ const COLORS = [
 ];
 
 const RADIAN = Math.PI / 180;
-const renderCombinedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, value, name }) => {
-  if (percent < 0.03) return null;
-  // Dilim merkezi (tam pasta için outerRadius * 0.6)
-  const ri = outerRadius * 0.6;
-  const xi = cx + ri * Math.cos(-midAngle * RADIAN);
-  const yi = cy + ri * Math.sin(-midAngle * RADIAN);
+
+// Dış etiketler için (% ve çizgi)
+const renderCombinedLabel = ({ cx, cy, midAngle, outerRadius, percent, index }) => {
+  if (percent <= 0) return null;
   // Dışarıda: % etiketi ve çizgi
   const ro1 = outerRadius + 8;
-  const ro2 = outerRadius + 30;
+  const ro2 = outerRadius + 34;
   const x1 = cx + ro1 * Math.cos(-midAngle * RADIAN);
   const y1 = cy + ro1 * Math.sin(-midAngle * RADIAN);
   const x2 = cx + ro2 * Math.cos(-midAngle * RADIAN);
-  const y2 = cy + ro2 * Math.sin(-midAngle * RADIAN);
+  const yNudge = index % 2 === 0 ? -6 : 6;
+  const y2 = cy + ro2 * Math.sin(-midAngle * RADIAN) + yNudge;
   const anchor = x2 > cx ? 'start' : 'end';
-  const shortName = name ? (name.length > 10 ? name.substring(0, 10) + '..' : name) : '';
   return (
     <g>
-      {percent >= 0.10 ? (
-        <g>
-          <text x={xi} y={yi - 8} fill="#fff" textAnchor="middle" dominantBaseline="central"
-            style={{ fontSize: 10, fontWeight: 600 }}>
-            {shortName}
-          </text>
-          <text x={xi} y={yi + 8} fill="#fff" textAnchor="middle" dominantBaseline="central"
-            style={{ fontSize: 11, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
-            {formatNumber(value)}
-          </text>
-        </g>
-      ) : percent > 0.05 ? (
-        <text x={xi} y={yi} fill="#fff" textAnchor="middle" dominantBaseline="central"
-          style={{ fontSize: 11, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
-          {formatNumber(value)}
-        </text>
-      ) : null}
       <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#94a3b8" strokeWidth={1} />
       <text x={x2 + (anchor === 'start' ? 4 : -4)} y={y2} fill="#374151"
         textAnchor={anchor} dominantBaseline="central" style={{ fontSize: 11, fontWeight: 700 }}>
         {`${(percent * 100).toFixed(0)}%`}
       </text>
     </g>
+  );
+};
+
+// Pasta dilimi içinde % yazısı
+const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+  if (percent <= 0) return null;
+  const radius = (innerRadius + outerRadius) / 2;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  
+  return (
+    <text 
+      x={x} 
+      y={y} 
+      fill="white" 
+      textAnchor="middle" 
+      dominantBaseline="central"
+      style={{ fontSize: 12, fontWeight: 700, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
+    >
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
   );
 };
 
@@ -236,6 +240,15 @@ const SwitchableChart = ({
   showPct = false, // when true: show % breakdown list below chart
 }) => {
   const [chartType, setChartType] = useState(defaultType);
+  const [isPieFullscreen, setIsPieFullscreen] = useState(defaultType === 'pie');
+
+  // Pasta grafiği seçildiğinde otomatik olarak tam ekran aç
+  const handleChartTypeChange = (type) => {
+    setChartType(type);
+    if (type === 'pie') {
+      setIsPieFullscreen(true);
+    }
+  };
 
   // When expanded, force horizontal and auto-calc height
   const effectiveType = expanded ? 'horizontal' : chartType;
@@ -246,13 +259,9 @@ const SwitchableChart = ({
     ? (sort ? [...data].sort((a, b) => toNumber(b[dataKey]) - toNumber(a[dataKey])) : [...data])
     : [];
 
-  // Pasta grafik için top 10 + Diğer; diğer grafikler için tüm veri
+  // Pasta grafik için de tüm veri kullanılır (dilim gizlenmez)
   const sortedData = (() => {
-    if (effectiveType !== 'pie' || allSorted.length <= 10) return allSorted;
-    const top10 = allSorted.slice(0, 10);
-    const rest = allSorted.slice(10);
-    const otherVal = rest.reduce((s, d) => s + (toNumber(d[dataKey]) || 0), 0);
-    return [...top10, { [nameKey]: 'Diğer (' + rest.length + ')', [dataKey]: otherVal }];
+    return allSorted;
   })();
 
   const renderChart = () => {
@@ -279,35 +288,197 @@ const SwitchableChart = ({
     switch (effectiveType) {
       case 'pie': {
         const pieTotal = sortedData.reduce((s, d) => s + (toNumber(d[dataKey]) || 0), 0);
+        
+        const pieContent = (
+          <ResponsiveContainer width="100%" height={isPieFullscreen ? 600 : 420}>
+            <PieChart margin={{ top: 40, right: 100, bottom: 40, left: 100 }}>
+              <Pie
+                data={sortedData}
+                dataKey={dataKey}
+                nameKey={nameKey}
+                cx="50%" cy="50%"
+                outerRadius={isPieFullscreen ? 180 : 135}
+                paddingAngle={2} startAngle={90} endAngle={-270}
+                labelLine={false} 
+                label={renderPieLabel}
+              >
+                {sortedData.map((_, index) => (
+                  <Cell key={index} fill={COLORS[index % COLORS.length]} stroke="#fff" strokeWidth={2} />
+                ))}
+              </Pie>
+              <Tooltip content={<CustomTooltip valueFormatter={formatter} />} />
+            </PieChart>
+          </ResponsiveContainer>
+        );
+
+        if (isPieFullscreen) {
+          return (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backdropFilter: 'blur(4px)',
+            }}>
+              <div style={{
+                background: '#fff',
+                borderRadius: '12px',
+                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)',
+                width: '95vw',
+                height: '95vh',
+                maxWidth: '1400px',
+                maxHeight: '900px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}>
+                {/* Modal Header */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '20px 24px',
+                  borderBottom: '1px solid #f1f5f9',
+                  background: '#f8fafc',
+                }}>
+                  <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                    {title}
+                  </h2>
+                  <button
+                    onClick={() => setIsPieFullscreen(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '24px',
+                      color: '#6a6d70',
+                      padding: '0',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <CloseOutlined />
+                  </button>
+                </div>
+
+                {/* Modal Body - Flex Layout */}
+                <div style={{
+                  display: 'flex',
+                  flex: 1,
+                  overflow: 'hidden',
+                  minHeight: 0,
+                }}>
+                  {/* Left: Chart */}
+                  <div style={{
+                    flex: '1.2',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'auto',
+                    padding: '20px',
+                  }}>
+                    {pieContent}
+                  </div>
+
+                  {/* Right: Legend with Details */}
+                  <div style={{
+                    flex: '0.8',
+                    borderLeft: '1px solid #f1f5f9',
+                    overflow: 'auto',
+                    padding: '20px',
+                    background: '#fafbfc',
+                  }}>
+                    <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Detaylı Bilgi
+                    </h4>
+                    {sortedData.map((item, i) => {
+                      const val = toNumber(item[dataKey]);
+                      const pct = pieTotal > 0 ? (val / pieTotal) * 100 : 0;
+                      return (
+                        <div key={i} style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px',
+                          padding: '12px',
+                          marginBottom: '8px',
+                          background: '#fff',
+                          borderRadius: '6px',
+                          borderLeft: `3px solid ${COLORS[i % COLORS.length]}`,
+                          borderTop: '1px solid #e2e8f0',
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                          }}>
+                            <span style={{
+                              fontSize: '10px',
+                              color: '#94a3b8',
+                              fontWeight: 700,
+                              width: '20px',
+                              textAlign: 'center',
+                            }}>
+                              #{i + 1}
+                            </span>
+                            <span style={{
+                              flex: 1,
+                              fontSize: '12px',
+                              color: '#1e293b',
+                              fontWeight: 600,
+                              whiteSpace: 'normal',
+                              wordBreak: 'break-word',
+                            }}>
+                              {item[nameKey]}
+                            </span>
+                          </div>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: '8px',
+                            fontSize: '11px',
+                          }}>
+                            <span style={{ color: '#6a6d70' }}>Miktar:</span>
+                            <span style={{ fontWeight: 700, color: '#0f172a' }}>{formatter(val)}</span>
+                          </div>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: '8px',
+                            fontSize: '11px',
+                          }}>
+                            <span style={{ color: '#6a6d70' }}>Oran:</span>
+                            <span style={{ fontWeight: 700, color: '#3b82f6' }}>{pct.toFixed(2)}%</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
         return (
           <>
-            <ResponsiveContainer width="100%" height={340}>
-              <PieChart margin={{ top: 20, right: 70, bottom: 20, left: 70 }}>
-                <Pie
-                  data={sortedData}
-                  dataKey={dataKey}
-                  nameKey={nameKey}
-                  cx="50%" cy="50%"
-                  outerRadius={110}
-                  paddingAngle={2} startAngle={90} endAngle={-270}
-                  labelLine={false} label={renderCombinedLabel}
-                >
-                  {sortedData.map((_, index) => (
-                    <Cell key={index} fill={COLORS[index % COLORS.length]} stroke="#fff" strokeWidth={2} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomTooltip valueFormatter={formatter} />} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div style={{ padding: '8px 12px 4px', borderTop: '1px solid #f1f5f9' }}>
+            {pieContent}
+            <div style={{ padding: '8px 12px 4px', borderTop: '1px solid #f1f5f9', maxHeight: 500, overflowY: 'auto' }}>
               {sortedData.map((item, i) => {
                 const val = toNumber(item[dataKey]);
+                const pct = pieTotal > 0 ? (val / pieTotal) * 100 : 0;
                 return (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: i < sortedData.length - 1 ? '1px solid #f8fafc' : 'none' }}>
                     <span style={{ fontSize: 11, color: '#94a3b8', width: 14, textAlign: 'right', flexShrink: 0, fontWeight: 600 }}>{i + 1}</span>
                     <span style={{ width: 12, height: 12, borderRadius: 3, background: COLORS[i % COLORS.length], flexShrink: 0 }} />
-                    <span style={{ flex: 1, fontSize: 12, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{item[nameKey]}</span>
-                    <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textAlign: 'right', flexShrink: 0 }}>{formatter(val)}</span>
+                    <span style={{ flex: 1, fontSize: 12, color: '#1e293b', whiteSpace: 'normal', wordBreak: 'break-word', fontWeight: 500 }}>{item[nameKey]}</span>
+                    <span style={{ fontSize: 11, color: '#3b82f6', fontWeight: 700, textAlign: 'right', width: 44, flexShrink: 0 }}>{pct.toFixed(1)}%</span>
+                    <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textAlign: 'right', width: 96, flexShrink: 0 }}>{formatter(val)}</span>
                   </div>
                 );
               })}
@@ -390,7 +561,7 @@ const SwitchableChart = ({
             <button
               key={type.key}
               className={`chart-type-btn ${(expanded ? 'horizontal' : chartType) === type.key ? 'active' : ''}`}
-              onClick={() => { if (!expanded) setChartType(type.key); }}
+              onClick={() => { if (!expanded) handleChartTypeChange(type.key); }}
               title={type.label}
               style={expanded ? { opacity: 0.4, cursor: 'default' } : {}}
             >

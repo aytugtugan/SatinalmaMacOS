@@ -45,6 +45,7 @@ const emptyForm = {
   tarih: new Date().toISOString().split('T')[0],
   siparis_numarasi: '',
   malzeme_hizmet: '',
+  masraf_merkezi: '',
   lokasyon: '',
   firma_1: '',
   firma_2: '',
@@ -60,6 +61,14 @@ const emptyForm = {
   kazanc_tutari_tl: '',
 };
 
+const normalizeFilterText = (v) =>
+  (v || '')
+    .toString()
+    .toLocaleUpperCase('tr-TR')
+    .replace(/İ/g, 'I')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 const IhaleYonetimi = ({ selectedAmbar = 'all' }) => {
   const [data, setData] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -69,11 +78,6 @@ const IhaleYonetimi = ({ selectedAmbar = 'all' }) => {
   const [lokasyonlar, setLokasyonlar] = useState([]);
   const [filterLokasyon, setFilterLokasyon] = useState('');
 
-  // Global fabrika filtresiyle senkronize et
-  useEffect(() => {
-    setPage(1);
-    setFilterLokasyon(selectedAmbar === 'all' ? '' : selectedAmbar);
-  }, [selectedAmbar]);
   const [searchText, setSearchText] = useState('');
 
   // Modal state
@@ -101,8 +105,32 @@ const IhaleYonetimi = ({ selectedAmbar = 'all' }) => {
       const params = { page, limit };
       if (filterLokasyon) params.lokasyon = filterLokasyon;
       const result = await getIhaleler(params);
-      setData(result.data || []);
-      setTotalCount(result.totalCount || 0);
+
+      const payload = result?.data && !Array.isArray(result.data) ? result.data : result;
+      const rows = Array.isArray(payload)
+        ? payload
+        : (Array.isArray(payload?.data)
+            ? payload.data
+            : (Array.isArray(payload?.rows) ? payload.rows : []));
+      const total = payload?.totalCount ?? payload?.total_count ?? payload?.pagination?.total ?? rows.length;
+
+      // Geçici lokasyon uyuşmazlığında ilk açılışta boş dönmesini engelle
+      if (rows.length === 0 && filterLokasyon && page === 1) {
+        const fallbackResult = await getIhaleler({ page, limit });
+        const fallbackPayload = fallbackResult?.data && !Array.isArray(fallbackResult.data) ? fallbackResult.data : fallbackResult;
+        const fallbackRows = Array.isArray(fallbackPayload)
+          ? fallbackPayload
+          : (Array.isArray(fallbackPayload?.data)
+              ? fallbackPayload.data
+              : (Array.isArray(fallbackPayload?.rows) ? fallbackPayload.rows : []));
+        const fallbackTotal = fallbackPayload?.totalCount ?? fallbackPayload?.total_count ?? fallbackPayload?.pagination?.total ?? fallbackRows.length;
+        setFilterLokasyon('');
+        setData(fallbackRows);
+        setTotalCount(fallbackTotal);
+      } else {
+        setData(rows);
+        setTotalCount(total);
+      }
     } catch (err) {
       console.error('İhale verileri yüklenemedi:', err);
       showToast('Veriler yüklenemedi: ' + err.message, 'error');
@@ -119,6 +147,19 @@ const IhaleYonetimi = ({ selectedAmbar = 'all' }) => {
       .catch(() => {});
   }, []);
 
+  // Global fabrika filtresini yalnızca lokasyon ile gerçekten eşleşiyorsa uygula
+  useEffect(() => {
+    setPage(1);
+    if (selectedAmbar === 'all') {
+      setFilterLokasyon('');
+      return;
+    }
+    const foundLokasyon = lokasyonlar.find(
+      l => normalizeFilterText(l) === normalizeFilterText(selectedAmbar)
+    );
+    setFilterLokasyon(foundLokasyon || '');
+  }, [selectedAmbar, lokasyonlar]);
+
   const handleNew = () => {
     setEditingSiraNo(null);
     setForm({ ...emptyForm });
@@ -131,6 +172,7 @@ const IhaleYonetimi = ({ selectedAmbar = 'all' }) => {
       tarih: row.tarih ? new Date(row.tarih).toISOString().split('T')[0] : '',
       siparis_numarasi: row.siparis_numarasi || '',
       malzeme_hizmet: row.malzeme_hizmet || '',
+      masraf_merkezi: row.masraf_merkezi || '',
       lokasyon: row.lokasyon || '',
       firma_1: row.firma_1 || '',
       firma_2: row.firma_2 || '',
@@ -157,6 +199,7 @@ const IhaleYonetimi = ({ selectedAmbar = 'all' }) => {
     try {
       const dto = {
         ...form,
+        masraf_merkezi: form.masraf_merkezi || '',
         teklif_1_tl: parseFloat(form.teklif_1_tl) || 0,
         teklif_2_tl: parseFloat(form.teklif_2_tl) || 0,
         teklif_3_tl: parseFloat(form.teklif_3_tl) || 0,
@@ -279,6 +322,7 @@ const IhaleYonetimi = ({ selectedAmbar = 'all' }) => {
               <th style={{ width: 100 }}>Tarih</th>
               <th style={{ width: 150 }}>Sipariş No</th>
               <th>Malzeme/Hizmet</th>
+              <th style={{ width: 150 }}>Masraf Merkezi</th>
               <th style={{ width: 110 }}>Lokasyon</th>
               <th style={{ width: 140 }}>Kazanan Tedarikçi</th>
               <th style={{ width: 120 }} className="text-right">Kazanç (TL)</th>
@@ -287,12 +331,12 @@ const IhaleYonetimi = ({ selectedAmbar = 'all' }) => {
           </thead>
           <tbody>
             {loading && !data.length ? (
-              <tr><td colSpan={8} className="ihale-empty">
+              <tr><td colSpan={9} className="ihale-empty">
                 <ReloadOutlined spin style={{ fontSize: 24, color: '#94a3b8' }} />
                 <span>Yükleniyor...</span>
               </td></tr>
             ) : filteredData.length === 0 ? (
-              <tr><td colSpan={8} className="ihale-empty">
+              <tr><td colSpan={9} className="ihale-empty">
                 <FileTextOutlined style={{ fontSize: 36, color: '#cbd5e1' }} />
                 <span>Kayıt bulunamadı</span>
               </td></tr>
@@ -308,6 +352,7 @@ const IhaleYonetimi = ({ selectedAmbar = 'all' }) => {
                   <td className="malzeme-cell" title={row.malzeme_hizmet}>
                     {row.malzeme_hizmet || '-'}
                   </td>
+                  <td>{row.masraf_merkezi || '-'}</td>
                   <td>
                     <span className="lokasyon-badge">
                       <EnvironmentOutlined /> {row.lokasyon || '-'}
@@ -414,6 +459,10 @@ const IhaleYonetimi = ({ selectedAmbar = 'all' }) => {
                     <span className="detail-value" style={{ fontWeight: 600 }}>{viewRow.malzeme_hizmet || '—'}</span>
                   </div>
                   <div className="ihale-detail-item">
+                    <span className="detail-label">Masraf Merkezi</span>
+                    <span className="detail-value">{viewRow.masraf_merkezi || '—'}</span>
+                  </div>
+                  <div className="ihale-detail-item">
                     <span className="detail-label">Lokasyon</span>
                     <span className="detail-value">
                       <span className="lokasyon-badge"><EnvironmentOutlined /> {viewRow.lokasyon || '—'}</span>
@@ -495,6 +544,10 @@ const IhaleYonetimi = ({ selectedAmbar = 'all' }) => {
                   <div className="ihale-form-field full">
                     <label>Malzeme/Hizmet *</label>
                     <input type="text" value={form.malzeme_hizmet} onChange={e => setField('malzeme_hizmet', e.target.value)} placeholder="Malzeme veya hizmet adı" />
+                  </div>
+                  <div className="ihale-form-field">
+                    <label>Masraf Merkezi</label>
+                    <input type="text" value={form.masraf_merkezi} onChange={e => setField('masraf_merkezi', e.target.value)} placeholder="Masraf merkezi" />
                   </div>
                   <div className="ihale-form-field">
                     <label>Lokasyon</label>

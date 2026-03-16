@@ -48,6 +48,10 @@ export async function getRaporTedarikci(params = {}) {
   return checkResult(await window.api.ihaleRaporTedarikci(params));
 }
 
+export async function getRaporMasrafMerkezi(params = {}) {
+  return checkResult(await window.api.ihaleRaporMasrafMerkezi(params));
+}
+
 export async function getRaporRekabet(params = {}) {
   return checkResult(await window.api.ihaleRaporRekabet(params));
 }

@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('api', {
   ihaleRaporOzet: (params) => ipcRenderer.invoke('ihale-rapor-ozet', params),
   ihaleRaporLokasyon: (params) => ipcRenderer.invoke('ihale-rapor-lokasyon', params),
   ihaleRaporTedarikci: (params) => ipcRenderer.invoke('ihale-rapor-tedarikci', params),
+  ihaleRaporMasrafMerkezi: (params) => ipcRenderer.invoke('ihale-rapor-masraf-merkezi', params),
   ihaleRaporRekabet: (params) => ipcRenderer.invoke('ihale-rapor-rekabet', params),
   ihaleRaporTrend: (params) => ipcRenderer.invoke('ihale-rapor-trend', params),
   ihaleRaporTasarruf: (params) => ipcRenderer.invoke('ihale-rapor-tasarruf', params),

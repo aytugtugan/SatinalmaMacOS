@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons';
 import {
   getRaporOzet, getRaporLokasyon, getRaporTedarikci,
+  getRaporMasrafMerkezi,
   getRaporRekabet, getRaporTrend, getRaporTasarruf,
   getLokasyonlar,
 } from '../api/ihaleApi';
@@ -33,38 +34,18 @@ const fmtShort = (val) => {
 };
 
 const RADIAN = Math.PI / 180;
-const renderCombinedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, value, name }) => {
-  if (percent < 0.03) return null;
-  const ri = outerRadius * 0.6;
-  const xi = cx + ri * Math.cos(-midAngle * RADIAN);
-  const yi = cy + ri * Math.sin(-midAngle * RADIAN);
+const renderCombinedLabel = ({ cx, cy, midAngle, outerRadius, percent, index }) => {
+  if (percent <= 0) return null;
   const ro1 = outerRadius + 8;
-  const ro2 = outerRadius + 30;
+  const ro2 = outerRadius + 34;
   const x1 = cx + ro1 * Math.cos(-midAngle * RADIAN);
   const y1 = cy + ro1 * Math.sin(-midAngle * RADIAN);
   const x2 = cx + ro2 * Math.cos(-midAngle * RADIAN);
-  const y2 = cy + ro2 * Math.sin(-midAngle * RADIAN);
+  const yNudge = index % 2 === 0 ? -6 : 6;
+  const y2 = cy + ro2 * Math.sin(-midAngle * RADIAN) + yNudge;
   const anchor = x2 > cx ? 'start' : 'end';
-  const shortName = name ? (name.length > 10 ? name.substring(0, 10) + '..' : name) : '';
   return (
     <g>
-      {percent >= 0.10 ? (
-        <g>
-          <text x={xi} y={yi - 8} fill="#fff" textAnchor="middle" dominantBaseline="central"
-            style={{ fontSize: 10, fontWeight: 600 }}>
-            {shortName}
-          </text>
-          <text x={xi} y={yi + 8} fill="#fff" textAnchor="middle" dominantBaseline="central"
-            style={{ fontSize: 11, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
-            {fmtShort(value)}
-          </text>
-        </g>
-      ) : percent > 0.05 ? (
-        <text x={xi} y={yi} fill="#fff" textAnchor="middle" dominantBaseline="central"
-          style={{ fontSize: 11, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
-          {fmtShort(value)}
-        </text>
-      ) : null}
       <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#94a3b8" strokeWidth={1} />
       <text x={x2 + (anchor === 'start' ? 4 : -4)} y={y2} fill="#374151"
         textAnchor={anchor} dominantBaseline="central" style={{ fontSize: 11, fontWeight: 700 }}>
@@ -174,13 +155,9 @@ const LegendTable = ({ headers, rows }) => (
 const RenderChart = ({ data, mode, dataKey, nameKey, height = 280 }) => {
   if (!data?.length) return <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>Veri bulunamadı</div>;
 
-  // Pasta grafik: top 10 + Diğer
+  // Pasta grafik: tüm veri kullanılır (dilim gizlenmez)
   const pieData = (() => {
-    if (mode !== 'pie' || data.length <= 10) return data;
-    const top10 = data.slice(0, 10);
-    const rest = data.slice(10);
-    const otherVal = rest.reduce((s, d) => s + (parseFloat(d[dataKey]) || 0), 0);
-    return [...top10, { [nameKey]: 'Diğer (' + rest.length + ')', [dataKey]: otherVal }];
+    return data;
   })();
 
   if (mode === 'pie') {
@@ -188,13 +165,13 @@ const RenderChart = ({ data, mode, dataKey, nameKey, height = 280 }) => {
     return (
       <>
         <div style={{ position: 'relative' }}>
-          <ResponsiveContainer width="100%" height={340}>
+          <ResponsiveContainer width="100%" height={420}>
             <PieChart margin={{ top: 20, right: 70, bottom: 20, left: 70 }}>
               <Pie data={pieData} dataKey={dataKey} nameKey={nameKey}
                 cx="50%" cy="50%"
-                outerRadius={110}
+                outerRadius={135}
                 paddingAngle={2} startAngle={90} endAngle={-270}
-                labelLine={false} label={renderCombinedLabel}
+                labelLine={false} label={false}
               >
                 {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="#fff" strokeWidth={2} />)}
               </Pie>
@@ -202,15 +179,17 @@ const RenderChart = ({ data, mode, dataKey, nameKey, height = 280 }) => {
             </PieChart>
           </ResponsiveContainer>
         </div>
-        <div style={{ padding: '8px 12px 4px', borderTop: '1px solid #f1f5f9' }}>
+        <div style={{ padding: '8px 12px 4px', borderTop: '1px solid #f1f5f9', maxHeight: 420, overflowY: 'auto' }}>
           {pieData.map((item, i) => {
             const val = parseFloat(item[dataKey]) || 0;
+            const pct = pieTotal > 0 ? (val / pieTotal) * 100 : 0;
             return (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: i < pieData.length - 1 ? '1px solid #f8fafc' : 'none' }}>
                 <span style={{ fontSize: 11, color: '#94a3b8', width: 14, textAlign: 'right', flexShrink: 0, fontWeight: 600 }}>{i + 1}</span>
                 <span style={{ width: 12, height: 12, borderRadius: 3, background: COLORS[i % COLORS.length], flexShrink: 0 }} />
-                <span style={{ flex: 1, fontSize: 12, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{item[nameKey]}</span>
-                <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textAlign: 'right', flexShrink: 0 }}>{fmtShort(val)}</span>
+                <span style={{ flex: 1, fontSize: 12, color: '#1e293b', whiteSpace: 'normal', wordBreak: 'break-word', fontWeight: 500 }}>{item[nameKey]}</span>
+                <span style={{ fontSize: 11, color: '#3b82f6', fontWeight: 700, textAlign: 'right', width: 44, flexShrink: 0 }}>{pct.toFixed(1)}%</span>
+                <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textAlign: 'right', width: 76, flexShrink: 0 }}>{fmtShort(val)}</span>
               </div>
             );
           })}
@@ -236,11 +215,12 @@ const RenderChart = ({ data, mode, dataKey, nameKey, height = 280 }) => {
 };
 
 /* ============ OZET TAB ============ */
-const OzetTab = ({ ozet, lokasyonData, tedarikciData, trendData, trendYil, setTrendYil }) => {
+const OzetTab = ({ ozet, lokasyonData, tedarikciData, masrafData, trendData, trendYil, setTrendYil }) => {
   const [lokMode, setLokMode] = useState('bar');
   const [tedMode, setTedMode] = useState('bar');
+  const [masrafMode, setMasrafMode] = useState('bar');
   const [trendMode, setTrendMode] = useState('bar');
-  const [showAllTed, setShowAllTed] = useState(false);
+  const [showAllTed, setShowAllTed] = useState(true);
   const [kpiDetail, setKpiDetail] = useState(null);
   const sortedTedarikci = (tedarikciData || []).slice().sort((a, b) => (b.toplam_kazanc_tl || 0) - (a.toplam_kazanc_tl || 0));
   const visibleTedarikci = showAllTed ? sortedTedarikci : sortedTedarikci.slice(0, 10);
@@ -339,18 +319,26 @@ const OzetTab = ({ ozet, lokasyonData, tedarikciData, trendData, trendYil, setTr
                   <strong key="v">{fmtCurrency(item.toplam_kazanc_tl)}</strong>,
                 ])}
               />
-              {sortedTedarikci.length > 10 && (
-                <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
-                  <button onClick={() => setShowAllTed(v => !v)}
-                    style={{ background: '#eff6ff', color: '#3b82f6', border: '1px solid #bfdbfe', borderRadius: 8, padding: '6px 20px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-                    {showAllTed ? 'İlk 10\'u Göster' : `Tümünü Gör (${sortedTedarikci.length})`}
-                  </button>
-                </div>
-              )}
             </>
           )}
         </ChartCard>
       </div>
+
+      <ChartCard title="Masraf Merkezi Getiri Dağılımı" headerRight={<ChartSwitch mode={masrafMode} setMode={setMasrafMode} />} style={{ marginBottom: 20 }}>
+        <RenderChart data={masrafData} mode={masrafMode} dataKey="toplam_kazanc_tl" nameKey="masraf_merkezi" />
+        {masrafData?.length > 0 && masrafMode !== 'pie' && (
+          <LegendTable headers={['Masraf Merkezi', 'İhale', 'Getiri']}
+            rows={masrafData.map((item, i) => [
+              <span key="n" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: COLORS[i % COLORS.length], display: 'inline-block' }} />
+                {i + 1}. {item.masraf_merkezi}
+              </span>,
+              item.ihale_sayisi,
+              <strong key="v">{fmtCurrency(item.toplam_kazanc_tl)}</strong>,
+            ])}
+          />
+        )}
+      </ChartCard>
 
       {/* Trend */}
       <ChartCard title="Aylık Trend" icon={<BarChartOutlined />}
@@ -484,6 +472,7 @@ const IhaleRaporlari = ({ selectedAmbar = '' }) => {
   const [ozet, setOzet] = useState(null);
   const [lokasyonData, setLokasyonData] = useState([]);
   const [tedarikciData, setTedarikciData] = useState([]);
+  const [masrafData, setMasrafData] = useState([]);
   const [rekabeData, setRekabeData] = useState([]);
   const [trendData, setTrendData] = useState([]);
   const [tasarrufData, setTasarrufData] = useState([]);
@@ -493,20 +482,22 @@ const IhaleRaporlari = ({ selectedAmbar = '' }) => {
     const params = {};
     if (selectedAmbar && selectedAmbar !== 'all') params.lokasyon = selectedAmbar;
     try {
-      const [ozetRes, lokRes, tedRes, rekRes, trendRes, tasRes] = await Promise.all([
+      const [ozetRes, lokRes, tedRes, masrafRes, rekRes, trendRes, tasRes] = await Promise.all([
         getRaporOzet(params).catch(e => { console.error('ozet err', e); return { data: {} }; }),
         getRaporLokasyon(params).catch(e => { console.error('lok err', e); return { data: [] }; }),
         getRaporTedarikci(params).catch(e => { console.error('ted err', e); return { data: [] }; }),
+        getRaporMasrafMerkezi(params).catch(e => { console.error('masraf err', e); return { data: [] }; }),
         getRaporRekabet(params).catch(e => { console.error('rek err', e); return { data: [] }; }),
         getRaporTrend({ ...params, yil: trendYil }).catch(e => { console.error('trend err', e); return { data: [] }; }),
         getRaporTasarruf(params).catch(e => { console.error('tas err', e); return { data: [] }; }),
       ]);
 
-      console.log('=== RAPOR API RAW ===', { ozetRes, lokRes, tedRes, rekRes, trendRes, tasRes });
+      console.log('=== RAPOR API RAW ===', { ozetRes, lokRes, tedRes, masrafRes, rekRes, trendRes, tasRes });
 
       setOzet(ozetRes.data || ozetRes || {});
       setLokasyonData(Array.isArray(lokRes.data) ? lokRes.data : (Array.isArray(lokRes) ? lokRes : []));
       setTedarikciData(Array.isArray(tedRes.data) ? tedRes.data : (Array.isArray(tedRes) ? tedRes : []));
+      setMasrafData(Array.isArray(masrafRes.data) ? masrafRes.data : (Array.isArray(masrafRes) ? masrafRes : []));
       const rekRaw = rekRes.data || rekRes;
       setRekabeData(Array.isArray(rekRaw) ? rekRaw : (Array.isArray(rekRaw?.pairs) ? rekRaw.pairs : []));
 
@@ -576,6 +567,7 @@ const IhaleRaporlari = ({ selectedAmbar = '' }) => {
         <>
           {activeTab === 'ozet' && (
             <OzetTab ozet={ozet} lokasyonData={lokasyonData} tedarikciData={tedarikciData}
+              masrafData={masrafData}
               trendData={trendData} trendYil={trendYil} setTrendYil={setTrendYil} />
           )}
           {activeTab === 'rekabet' && <RekabeTab rekabeData={rekabeData} />}
