@@ -135,11 +135,7 @@ const Dashboard = ({ data, comparisonData = {}, selectedAmbar = 'all' }) => {
           <div className="kpi-value">{formatNumber(summary?.totalTalepEden || 0)}</div>
           <div className="kpi-label">Talep Eden Sayısı</div>
         </div>
-        <div className="kpi-card">
-          <div className="kpi-icon blue"><FileTextOutlined /></div>
-          <div className="kpi-value">{formatNumber(summary?.totalTalep || 0)}</div>
-          <div className="kpi-label">Toplam Talep</div>
-        </div>
+        
         <div className="kpi-card">
           <div className="kpi-icon green"><FieldTimeOutlined /></div>
           <div className="kpi-value">{data.teslimatSuresi?.ortalamaTeslimatSuresi || 0} Gün</div>

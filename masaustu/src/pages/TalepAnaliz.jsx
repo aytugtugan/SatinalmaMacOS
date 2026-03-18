@@ -64,11 +64,7 @@ const TalepAnaliz = ({ data, comparisonData = {}, selectedAmbar = 'all' }) => {
           <div className="kpi-value">{masrafMerkezi?.length || 0}</div>
           <div className="kpi-label">Masraf Merkezi</div>
         </div>
-        <div className="kpi-card">
-          <div className="kpi-icon orange"><RiseOutlined /></div>
-          <div className="kpi-value">{formatNumber(summary?.totalTalep || 0)}</div>
-          <div className="kpi-label">Toplam Talep</div>
-        </div>
+        
       </div>
 
       <div style={{ padding: '0 32px 8px' }}>
