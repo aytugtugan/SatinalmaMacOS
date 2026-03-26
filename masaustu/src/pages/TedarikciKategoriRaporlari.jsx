@@ -15,12 +15,11 @@ import {
   getRaporKategoriKarsilastirma, getRaporKategoriListesi,
   getTedarikciKategoriler,
 } from '../api/tedarikciKategoriApi';
-
 const COLORS = [
   '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
   '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#6366f1',
 ];
-
+ 
 const RADIAN = Math.PI / 180;
 const fmtShort = (val) => {
   if (!val && val !== 0) return '0';
@@ -123,9 +122,7 @@ const OzetTab = ({ istatistik, istatistikErr, tipData, tipErr, kategoriOzet, kat
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
           {[
             { label: 'Toplam Tedarikçi', value: istatistik.toplam_kayit, color: '#8b5cf6', icon: <TagsOutlined /> },
-            { label: 'Benzersiz Tedarikçi', value: istatistik.benzersiz_tedarikci, color: '#3b82f6', icon: <TeamOutlined /> },
-            { label: 'Benzersiz Tedarikçi Kategorisi', value: istatistik.benzersiz_kategori, color: '#10b981', icon: <TagsOutlined /> },
-            { label: 'Benzersiz Tip', value: istatistik.benzersiz_tip, color: '#f59e0b', icon: <SwapOutlined /> },
+            { label: 'Tedarikçi Kategorisi', value: istatistik.benzersiz_kategori, color: '#10b981', icon: <TagsOutlined /> },
           ].map((c, i) => (
             <div key={i} style={{ background: '#fff', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ width: 48, height: 48, borderRadius: 12, background: c.color + '15', color: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>{c.icon}</div>
@@ -180,31 +177,40 @@ const OzetTab = ({ istatistik, istatistikErr, tipData, tipErr, kategoriOzet, kat
         >
           {kategoriOzetErr ? <ErrorBox message={kategoriOzetErr} /> : kategoriOzet?.length > 0 ? (
             chartMode === 'pie' ? (
-              <SwitchableChart
-                title="Kategori Bazlı Tedarikçi Sayısı"
-                data={kategoriOzet}
-                dataKey="tedarikci_sayisi"
-                nameKey="kategori"
-                defaultType="pie"
-                valueFormatter={(v) => String(v)}
-                height={340}
-                showPct={true}
-                maxPieItems={10}
-                expanded={expandedKategori}
-              />
+              <div style={expandedKategori ? { gridColumn: 'span 2' } : {}}>
+                <SwitchableChart
+                  title="Kategori Bazlı Tedarikçi Sayısı"
+                  data={kategoriOzet}
+                  dataKey="tedarikci_sayisi"
+                  nameKey="kategori"
+                  mode={chartMode}
+                  onModeChange={setChartMode}
+                  defaultType="pie"
+                  valueFormatter={(v) => String(v)}
+                  height={340}
+                  showPct={true}
+                  maxPieItems={10}
+                  expanded={expandedKategori}
+                  hideHeader={true}
+                />
+              </div>
             ) : (
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={kategoriOzet.slice(0, 15)} margin={{ top: 20, right: 30, left: 10, bottom: 80 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis dataKey="kategori" tick={{ fontSize: 10, fill: '#6a6d70' }} angle={-45} textAnchor="end" height={80} tickLine={false}
-                    tickFormatter={v => v?.length > 15 ? v.substring(0, 15) + '...' : v} />
-                  <YAxis tick={{ fontSize: 11, fill: '#6a6d70' }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="tedarikci_sayisi" name="Tedarikçi Sayısı" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                    {kategoriOzet.slice(0, 15).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <div style={expandedKategori ? { gridColumn: 'span 2' } : {}}>
+                <SwitchableChart
+                  title="Kategori Bazlı Tedarikçi Sayısı"
+                  data={expandedKategori ? kategoriOzet : kategoriOzet.slice(0, 15)}
+                  dataKey="tedarikci_sayisi"
+                  nameKey="kategori"
+                  mode={chartMode}
+                  onModeChange={setChartMode}
+                  defaultType="bar"
+                  valueFormatter={(v) => String(v)}
+                  height={expandedKategori ? Math.max(420, kategoriOzet.length * 28) : 280}
+                  sort={false}
+                  expanded={expandedKategori}
+                  hideHeader={true}
+                />
+              </div>
             )
           ) : <NoData />}
         </ChartCard>

@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('api', {
   windowIsMaximized: () => ipcRenderer.invoke('window-is-maximized'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   restartForUpdate: () => ipcRenderer.invoke('restart-for-update'),
+  savePdfToDesktopAndOpen: (payload) => ipcRenderer.invoke('save-pdf-to-desktop-and-open', payload),
   onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (_event, info) => callback(info)),
   onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', (_event, info) => callback(info)),
   onDownloadProgress: (callback) => ipcRenderer.on('download-progress', (_event, progress) => callback(progress)),

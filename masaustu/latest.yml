@@ -1,8 +1,8 @@
-version: 1.0.22
+version: 1.0.25
 files:
-  - url: Satin.Alma.Rapor.Setup.1.0.22.exe
-    sha512: UZ+R+H5PXEOu1WG6K3mQfbcyptn4MsB6p+wbQPTe7IRtQmjTJpXFkktnJ7N86DefAYzgXbVHpE/qU8ERExnR5g==
-    size: 106244362
-path: Satin.Alma.Rapor.Setup.1.0.22.exe
-sha512: UZ+R+H5PXEOu1WG6K3mQfbcyptn4MsB6p+wbQPTe7IRtQmjTJpXFkktnJ7N86DefAYzgXbVHpE/qU8ERExnR5g==
-releaseDate: '2026-03-18T08:07:15.954Z'
+  - url: Satin.Alma.Rapor.Setup.1.0.25.exe
+    sha512: GCz2xcGXOVht9Efx0kUSQzZNVBIfK2IBU/7gtJrHYI2G5Lm/6WRmG4HjzMbWutX04kynAYHEBAueTZs0JRHBmQ==
+    size: 111513675
+path: Satin.Alma.Rapor.Setup.1.0.25.exe
+sha512: GCz2xcGXOVht9Efx0kUSQzZNVBIfK2IBU/7gtJrHYI2G5Lm/6WRmG4HjzMbWutX04kynAYHEBAueTZs0JRHBmQ==
+releaseDate: '2026-03-26T10:11:01.830Z'

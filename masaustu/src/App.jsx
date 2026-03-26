@@ -12,7 +12,8 @@ import IhaleYonetimi from './pages/IhaleYonetimi';
 import IhaleRaporlari from './pages/IhaleRaporlari';
 import TedarikciKategori from './pages/TedarikciKategori';
 import TedarikciKategoriRaporlari from './pages/TedarikciKategoriRaporlari';
-import { ShopOutlined, ReloadOutlined, MinusOutlined, FullscreenOutlined, FullscreenExitOutlined, CloseOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import PdfExportModal from './components/PdfExportModal';
+import { ShopOutlined, ReloadOutlined, MinusOutlined, FullscreenOutlined, FullscreenExitOutlined, CloseOutlined, ClockCircleOutlined, FilePdfOutlined } from '@ant-design/icons';
 import './styles.css';
 
 const App = () => {
@@ -30,6 +31,7 @@ const App = () => {
   const [updateStatus, setUpdateStatus] = useState(null); // null | 'downloading' | 'ready'
   const [updateVersion, setUpdateVersion] = useState('');
   const [downloadPercent, setDownloadPercent] = useState(0);
+  const [pdfModalOpen, setPdfModalOpen] = useState(false);
 
   // Saat güncelleyici
   useEffect(() => {
@@ -315,6 +317,10 @@ const App = () => {
                   <ReloadOutlined spin={loading} />
                   <span>Yenile</span>
                 </button>
+                <button className="refresh-btn" onClick={() => setPdfModalOpen(true)}>
+                  <FilePdfOutlined />
+                  <span>PDF İndir</span>
+                </button>
 
                 <div className="win-controls">
                   <button className="win-btn win-minimize" onClick={handleMinimize} title="Küçült">
@@ -350,8 +356,23 @@ const App = () => {
           </main>
         </div>
       </div>
+      <PdfExportModal
+        open={pdfModalOpen}
+        onClose={() => setPdfModalOpen(false)}
+        dashboardData={dashboardData}
+        comparisonData={comparisonData}
+        selectedAmbar={selectedAmbar}
+        ambarList={ambarList}
+        selectedAmbarLabel={
+          selectedAmbar === 'all'
+            ? 'Tüm Fabrikalar'
+            : (ambarList.find((x) => x.ambar === selectedAmbar)?.displayName || selectedAmbar)
+        }
+      />
     </ConfigProvider>
   );
 };
 
 export default App;
+
+

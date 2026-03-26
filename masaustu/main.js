@@ -203,6 +203,23 @@ ipcMain.handle('restart-for-update', () => {
   autoUpdater.quitAndInstall(true, true);
 });
 
+ipcMain.handle('save-pdf-to-desktop-and-open', async (event, payload) => {
+  try {
+    const desktopPath = app.getPath('desktop');
+    const rawName = (payload && payload.fileName) ? String(payload.fileName) : `satin-alma-rapor-${new Date().toISOString().slice(0, 10)}.pdf`;
+    const safeName = rawName.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
+    const bytes = Array.isArray(payload && payload.bytes) ? payload.bytes : [];
+    const buffer = Buffer.from(bytes);
+    const targetPath = path.join(desktopPath, safeName.endsWith('.pdf') ? safeName : `${safeName}.pdf`);
+    fs.writeFileSync(targetPath, buffer);
+    const openError = await shell.openPath(targetPath);
+    return { success: true, filePath: targetPath, openError: openError || null };
+  } catch (error) {
+    console.error('save-pdf-to-desktop-and-open error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // IPC Handlers
 ipcMain.handle('get-data', async (event, query) => {
   try {

@@ -246,7 +246,7 @@ const OzetTab = ({ ozet, lokasyonData, tedarikciData, masrafData, trendData, tre
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))', gap: 20, marginBottom: 20 }}>
         {/* Lokasyon */}
-        <ChartCard title="Lokasyon Getiri Dağılımı" headerRight={<ChartSwitch mode={lokMode} setMode={setLokMode} />}>
+        <ChartCard title="Lokasyon Getiri Dağılımı">
           <RenderChart data={lokasyonData} mode={lokMode} dataKey="toplam_kazanc_tl" nameKey="lokasyon" />
           {lokasyonData?.length > 0 && lokMode !== 'pie' && (
             <LegendTable headers={['Lokasyon', 'İhale', 'Getiri']}
@@ -263,7 +263,7 @@ const OzetTab = ({ ozet, lokasyonData, tedarikciData, masrafData, trendData, tre
         </ChartCard>
 
         {/* Tedarikçi */}
-          <ChartCard title="Tedarikçi Kazanç Dağılımı" headerRight={<ChartSwitch mode={tedMode} setMode={setTedMode} />}>
+          <ChartCard title="Tedarikçi Kazanç Dağılımı">
           <RenderChart data={visibleTedarikci} mode={tedMode} dataKey="toplam_kazanc_tl" nameKey="kazanan_tedarikci" maxPieItems={10} />
           {sortedTedarikci?.length > 0 && tedMode !== 'pie' && (
             <>
@@ -282,7 +282,7 @@ const OzetTab = ({ ozet, lokasyonData, tedarikciData, masrafData, trendData, tre
         </ChartCard>
       </div>
 
-      <ChartCard title="Masraf Merkezi Getiri Dağılımı" headerRight={<ChartSwitch mode={masrafMode} setMode={setMasrafMode} />} style={{ marginBottom: 20 }}>
+      <ChartCard title="Masraf Merkezi Getiri Dağılımı" style={{ marginBottom: 20 }}>
         <RenderChart data={masrafData} mode={masrafMode} dataKey="toplam_kazanc_tl" nameKey="masraf_merkezi" maxPieItems={10} />
         {masrafData?.length > 0 && masrafMode !== 'pie' && (
           <LegendTable headers={['Masraf Merkezi', 'İhale', 'Getiri']}
@@ -307,7 +307,6 @@ const OzetTab = ({ ozet, lokasyonData, tedarikciData, masrafData, trendData, tre
               <span style={{ minWidth: 50, textAlign: 'center', fontWeight: 600, fontSize: 14 }}>{trendYil}</span>
               <button onClick={() => setTrendYil(y => y + 1)} style={{ border: '1px solid #e2e8f0', background: '#fff', borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}><RightOutlined /></button>
             </div>
-            <ChartSwitch mode={trendMode} setMode={setTrendMode} />
           </div>
         }
       >

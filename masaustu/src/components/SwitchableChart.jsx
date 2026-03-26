@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
   PieChart,
   Pie,
   Label,
@@ -15,6 +17,7 @@ import {
 } from 'recharts';
 import {
   BarChartOutlined,
+  LineChartOutlined,
   PieChartOutlined,
   MenuOutlined,
   InboxOutlined,
@@ -98,6 +101,7 @@ const renderPieLabelInner = ({ cx, cy, midAngle, innerRadius, outerRadius, perce
 
 const CHART_TYPES = [
   { key: 'bar', icon: <BarChartOutlined />, label: 'Cubuk Grafik' },
+  { key: 'line', icon: <LineChartOutlined />, label: 'Cizgi Grafik' },
   { key: 'pie', icon: <PieChartOutlined />, label: 'Pasta Grafik' },
   { key: 'horizontal', icon: <MenuOutlined />, label: 'Yatay Cubuk' },
 ];
@@ -273,12 +277,9 @@ const SwitchableChart = ({
     }
   };
 
-  // When expanded, increase height but don't force chart type change for pies.
+  // When expanded, force horizontal and auto-calc height
   const effectiveChartType = typeof mode === 'string' ? mode : chartType;
-  let effectiveType = effectiveChartType;
-  if (expanded && effectiveChartType === 'bar') {
-    effectiveType = 'horizontal';
-  }
+  const effectiveType = expanded ? 'horizontal' : effectiveChartType;
   const effectiveHeight = expanded ? Math.max(400, (data?.length || 0) * 34) : height;
 
   // safe sorted copy (descending by numeric value of dataKey) when sort enabled
@@ -377,9 +378,41 @@ const SwitchableChart = ({
     };
 
     switch (effectiveType) {
+      case 'line':
+        return (
+          <ResponsiveContainer width="100%" height={effectiveHeight}>
+            <LineChart data={sortedData} margin={{ top: 20, right: 30, left: 10, bottom: 60 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <XAxis
+                dataKey={nameKey}
+                tick={{ fontSize: 11, fill: '#6a6d70', fontFamily: "'72', 'Segoe UI', sans-serif" }}
+                angle={-45}
+                textAnchor="end"
+                height={70}
+                axisLine={{ stroke: '#f1f5f9' }}
+                tickLine={false}
+              />
+              <YAxis
+                tickFormatter={formatter}
+                tick={{ fontSize: 11, fill: '#6a6d70', fontFamily: "'72', 'Segoe UI', sans-serif" }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip content={<CustomTooltip valueFormatter={formatter} />} />
+              <Line
+                type="monotone"
+                dataKey={dataKey}
+                stroke="#2563eb"
+                strokeWidth={3}
+                dot={{ r: 3, fill: '#2563eb' }}
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        );
+
       case 'pie': {
-        // If expanded, show full data even if maxPieItems is set; otherwise limit to top N
-        const pieData = (expanded || !(typeof maxPieItems === 'number' && maxPieItems > 0)) ? sortedData : sortedData.slice(0, maxPieItems);
+        const pieData = (typeof maxPieItems === 'number' && maxPieItems > 0) ? sortedData.slice(0, maxPieItems) : sortedData;
         const pieTotal = pieData.reduce((s, d) => s + (toNumber(d[dataKey]) || 0), 0);
 
         const pieContent = (
