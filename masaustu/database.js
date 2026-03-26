@@ -279,7 +279,7 @@ async function getDashboardStats(ambarFilter) {
   for (var i = 0; i < filteredData.length; i++) {
     var r = filteredData[i];
     if (!r.SIPARIS_NO) continue;
-    var hasDelivery = r.FATURAYI_KAYDEDEN && r.FATURAYI_KAYDEDEN !== '';
+    var hasDelivery = r.TESLIM_EVRAK_NO && String(r.TESLIM_EVRAK_NO).trim() !== '';
     if (!siparisDeliveryStatus.has(r.SIPARIS_NO) || hasDelivery) {
       siparisDeliveryStatus.set(r.SIPARIS_NO, hasDelivery || siparisDeliveryStatus.get(r.SIPARIS_NO) || false);
     }
@@ -486,7 +486,7 @@ async function getFactoryComparisonData() {
     for (var fi = 0; fi < filteredData.length; fi++) {
       var fr = filteredData[fi];
       if (!fr.SIPARIS_NO) continue;
-      var hasDelivery = fr.FATURAYI_KAYDEDEN && fr.FATURAYI_KAYDEDEN !== '';
+      var hasDelivery = fr.TESLIM_EVRAK_NO && String(fr.TESLIM_EVRAK_NO).trim() !== '';
       if (!siparisDeliveryStatus.has(fr.SIPARIS_NO) || hasDelivery) {
         siparisDeliveryStatus.set(fr.SIPARIS_NO, hasDelivery || siparisDeliveryStatus.get(fr.SIPARIS_NO) || false);
       }

@@ -603,40 +603,61 @@ const DetayliRapor = ({ data, selectedIsyeri, columns }) => {
 
   // Excel export (write real XLSX with numeric types)
   const handleExport = () => {
-    const headers = ['Sipariş No', 'Talep No', 'Talep Eden', 'Sipariş Tarihi', 'Tedarikçi', 'Masraf Merkezi', 'Malzeme/Hizmet', 'Miktar', 'Birim Fiyatı', 'Toplam (TRY)', 'Toplam (Orijinal)', 'Para Birimi', 'Ödeme Vadesi', 'Teslim Evrak No'];
-    const keys = ['SIPARIS_NO', 'TALEP_NO', 'TALEP_EDEN', 'SIPARIS_TARIHI', 'CARI_UNVANI', 'MASRAF_MERKEZI', 'SIPARIS_MALZEME', 'MIKTAR', 'BIRIM_FIYAT', 'TOPLAM_TRY', 'TOPLAM', 'PARA_BIRIMI', 'ODEME_VADESI', 'TESLIM_EVRAK_NO'];
+    const safeNum = (v) => {
+      if (v == null || v === '') return null;
+      if (typeof v === 'number') return v;
+      const s = String(v).trim();
+      const cleaned = s.replace(/[^0-9,.-]/g, '').replace(/\.(?=\d{3}(?:[,.]|$))/g, '').replace(/,/g, '.');
+      const n = Number(cleaned);
+      return Number.isFinite(n) ? n : null;
+    };
 
-    const rows = filteredData.map(row => {
-      const safeNum = (v) => {
-        if (v == null || v === '') return null;
-        if (typeof v === 'number') return v;
-        const s = String(v).trim();
-        // handle both 1.234.567,89 and 1234.56
-        const cleaned = s.replace(/[^0-9,.-]/g, '').replace(/\.(?=\d{3}(?:[,.]|$))/g, '').replace(/,/g, '.');
-        const n = Number(cleaned);
-        return Number.isFinite(n) ? n : null;
-      };
+    let headers = [];
+    let rows = [];
+    let numCols = [];
 
-      const out = {};
-      headers.forEach((h, i) => {
-        const key = keys[i];
-        if (key === 'SIPARIS_TARIHI') {
-          out[h] = row[key] ? dayjs(row[key]).format('DD.MM.YYYY') : '';
-        } else if (['MIKTAR'].includes(key)) {
-          out[h] = safeNum(row[key]);
-        } else if (['BIRIM_FIYAT', 'TOPLAM_TRY', 'TOPLAM'].includes(key)) {
-          out[h] = safeNum(row[key]);
-        } else {
-          out[h] = row[key] != null ? String(row[key]) : '';
-        }
+    if (groupByOrder && groupedData) {
+      headers = ['Sipariş No', 'Sipariş Tarihi', 'Tedarikçi', 'Talep Eden', 'Masraf Merkezi', 'Kalem Sayısı', 'Toplam Tutar (TRY)', 'Ödeme Vadesi', 'Teslim Durumu'];
+      numCols = ['Kalem Sayısı', 'Toplam Tutar (TRY)'];
+      rows = groupedData.map((row) => ({
+        'Sipariş No': row.SIPARIS_NO || '',
+        'Sipariş Tarihi': row.SIPARIS_TARIHI ? dayjs(row.SIPARIS_TARIHI).format('DD.MM.YYYY') : '',
+        'Tedarikçi': row.CARI_UNVANI || '',
+        'Talep Eden': row.TALEP_EDEN || '',
+        'Masraf Merkezi': row.MASRAF_MERKEZI || '',
+        'Kalem Sayısı': row.items?.length ?? 0,
+        'Toplam Tutar (TRY)': safeNum(row.totalTRY),
+        'Ödeme Vadesi': row.ODEME_VADESI || '',
+        'Teslim Durumu': row.isDelivered ? 'Teslim Edildi' : 'Bekliyor',
+      }));
+    } else {
+      headers = ['Sipariş No', 'Talep No', 'Talep Eden', 'Sipariş Tarihi', 'Tedarikçi', 'Masraf Merkezi', 'Malzeme/Hizmet', 'Miktar', 'Birim Fiyatı', 'Toplam (TRY)', 'Toplam (Orijinal)', 'Para Birimi', 'Ödeme Vadesi', 'Teslim Evrak No', 'Teslim Durumu'];
+      numCols = ['Miktar', 'Birim Fiyatı', 'Toplam (TRY)', 'Toplam (Orijinal)'];
+      rows = filteredData.map((row) => {
+        const evrakNo = row['TESLIM_EVRAK_NO'];
+        return {
+          'Sipariş No': row.SIPARIS_NO || '',
+          'Talep No': row.TALEP_NO || '',
+          'Talep Eden': row.TALEP_EDEN || '',
+          'Sipariş Tarihi': row.SIPARIS_TARIHI ? dayjs(row.SIPARIS_TARIHI).format('DD.MM.YYYY') : '',
+          'Tedarikçi': row.CARI_UNVANI || '',
+          'Masraf Merkezi': row.MASRAF_MERKEZI || '',
+          'Malzeme/Hizmet': row.SIPARIS_MALZEME || '',
+          Miktar: safeNum(row.MIKTAR),
+          'Birim Fiyatı': safeNum(row.BIRIM_FIYAT),
+          'Toplam (TRY)': safeNum(row.TOPLAM_TRY),
+          'Toplam (Orijinal)': safeNum(row.TOPLAM),
+          'Para Birimi': row.PARA_BIRIMI || '',
+          'Ödeme Vadesi': row.ODEME_VADESI || '',
+          'Teslim Evrak No': evrakNo != null ? String(evrakNo) : '',
+          'Teslim Durumu': evrakNo && String(evrakNo).trim() !== '' ? 'Teslim Edildi' : 'Bekliyor',
+        };
       });
-      return out;
-    });
+    }
 
     const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
     // ensure numeric columns are numeric in sheet
     const hdrIdx = XLSX.utils.sheet_to_json(ws, { header: 1 })[0];
-    const numCols = ['Miktar', 'Birim Fiyatı', 'Toplam (TRY)', 'Toplam (Orijinal)'];
     const range = XLSX.utils.decode_range(ws['!ref']);
     for (let R = range.s.r + 1; R <= range.e.r; ++R) {
       for (let C = range.s.c; C <= range.e.c; ++C) {
