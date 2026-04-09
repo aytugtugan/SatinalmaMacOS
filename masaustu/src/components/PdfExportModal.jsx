@@ -27,7 +27,6 @@ const STYLE_OPTIONS = [
 
 const SECTIONS = [
   { key: 'dashboard', label: 'Dashboard', icon: <AppstoreOutlined /> },
-  { key: 'talep', label: 'Talep Analizi', icon: <BarChartOutlined /> },
   { key: 'siparis', label: 'Sipariş Analizi', icon: <BarChartOutlined /> },
   { key: 'tedarikci', label: 'Tedarikçi Analizi', icon: <TeamOutlined /> },
   { key: 'finansal', label: 'Finansal Analiz', icon: <FundOutlined /> },
@@ -111,7 +110,6 @@ function buildBaseCatalog(dashboardData, comparisonData, selectedAmbar) {
   if (f.length > 0) {
     charts.push(makeChart('fabrika-toplam', 'fabrika', 'Fabrika Bazında Toplam Tutar', sortDesc(f.map(([n, v]) => ({ name: n, value: toNumber(v.toplamTutar) }))), formatCurrency));
     charts.push(makeChart('fabrika-siparis', 'fabrika', 'Fabrika Bazında Sipariş Adedi', sortDesc(f.map(([n, v]) => ({ name: n, value: toNumber(v.siparisAdedi) }))), formatNumber));
-    charts.push(makeChart('fabrika-talep', 'fabrika', 'Fabrika Bazında Talep Adedi', sortDesc(f.map(([n, v]) => ({ name: n, value: toNumber(v.talepAdedi) }))), formatNumber));
     charts.push(makeChart('fabrika-teslim-orani', 'fabrika', 'Fabrika Bazında Teslim Oranı (%)', sortDesc(f.map(([n, v]) => ({ name: n, value: toNumber(v.teslimOrani) }))), (v) => `%${toNumber(v).toFixed(1)}`, ['bar', 'horizontal']));
     charts.push(makeChart('fabrika-teslim-edilen', 'fabrika', 'Fabrika Bazında Teslim Edilen', sortDesc(f.map(([n, v]) => ({ name: n, value: toNumber(v.teslimEdilen) }))), formatNumber));
     charts.push(makeChart('fabrika-bekleyen', 'fabrika', 'Fabrika Bazında Bekleyen', sortDesc(f.map(([n, v]) => ({ name: n, value: toNumber(v.bekleyen) }))), formatNumber));
@@ -145,7 +143,6 @@ function buildBaseCatalog(dashboardData, comparisonData, selectedAmbar) {
           `Seçili Fabrika KPI Dağılımı (${factoryName})`,
           [
             { name: 'Sipariş Adedi', value: toNumber(m.siparisAdedi) },
-            { name: 'Talep Adedi', value: toNumber(m.talepAdedi) },
             { name: 'Teslim Edilen', value: toNumber(m.teslimEdilen) },
             { name: 'Bekleyen', value: toNumber(m.bekleyen) },
             { name: 'Teslim Oranı', value: toNumber(m.teslimOrani) },
@@ -369,7 +366,7 @@ const PdfExportModal = ({ open, onClose, dashboardData, comparisonData, selected
   const catalog = useMemo(() => {
     const base = buildBaseCatalog(filteredDashboardData || dashboardData, comparisonData, reportFilter);
     const extra = buildExtraCatalog(extraData);
-    return [...base, ...extra].filter((x) => x.data.length > 0);
+    return [...base, ...extra].filter((x) => x.data.length > 0 && x.section !== 'talep' && !String(x.title || '').toLocaleLowerCase('tr-TR').includes('talep'));
   }, [filteredDashboardData, dashboardData, comparisonData, reportFilter, extraData]);
 
   const filterOptions = useMemo(() => {

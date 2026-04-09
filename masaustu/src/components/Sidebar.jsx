@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   AppstoreOutlined,
-  FileSearchOutlined,
   ShoppingCartOutlined,
   TeamOutlined,
   FundOutlined,
@@ -13,13 +12,13 @@ import {
   LoadingOutlined,
   TagsOutlined,
   PieChartFilled,
+  SoundOutlined,
 } from '@ant-design/icons';
 
-import logoImgInline from '../../assets/logo.jpg?inline';
+import logoImgInline from '../../assets/onculogo.png?inline';
 
 const menuItems = [
   { key: 'dashboard', icon: <AppstoreOutlined />, label: 'Dashboard' },
-  { key: 'talep', icon: <FileSearchOutlined />, label: 'Talep Analizi' },
   { key: 'siparis', icon: <ShoppingCartOutlined />, label: 'Sipariş Analizi' },
   { key: 'tedarikci', icon: <TeamOutlined />, label: 'Tedarikçi Analizi' },
   { key: 'finansal', icon: <FundOutlined />, label: 'Finansal Analiz' },
@@ -28,6 +27,7 @@ const menuItems = [
   { key: 'ihaleRapor', icon: <BarChartOutlined />, label: 'İhale Raporları' },
   { key: 'tedarikciKategori', icon: <TagsOutlined />, label: 'Tedarikçi Kategori' },
   { key: 'tedarikciKategoriRapor', icon: <PieChartFilled />, label: 'Tedarikçi Kategori Raporları' },
+  { key: 'sesliOzet', icon: <SoundOutlined />, label: 'Sesli Özet' },
 ];
 
 const Sidebar = ({ currentPage, setCurrentPage, updateStatus, downloadPercent, onCheckUpdate, onRestartUpdate }) => {

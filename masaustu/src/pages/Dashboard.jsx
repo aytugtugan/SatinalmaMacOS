@@ -4,14 +4,12 @@ import CompareSwitch from '../components/CompareSwitch';
 import ComparisonChart from '../components/ComparisonChart';
 import FabrikaTeslimKarsilastirma from '../components/FabrikaTeslimKarsilastirma';
 import {
-  FileTextOutlined,
   ShoppingCartOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   TeamOutlined,
   WalletOutlined,
-  UserOutlined,
-  FieldTimeOutlined,
+  CalendarOutlined,
 } from '@ant-design/icons';
 
 const TOP_N = 10;
@@ -37,64 +35,50 @@ const Dashboard = ({ data, comparisonData = {}, selectedAmbar = 'all' }) => {
   const [showAllTedarikci, setShowAllTedarikci] = useState(false);
   const [showAllOdeme, setShowAllOdeme] = useState(false);
   const [showAllOdemeAdet, setShowAllOdemeAdet] = useState(false);
-  const [showAllTalep, setShowAllTalep] = useState(false);
   const [showAllDurum, setShowAllDurum] = useState(false);
   const [showAllParaBirimi, setShowAllParaBirimi] = useState(false);
 
   if (!data) return null;
 
-  const { summary, monthlyTrend, tedarikci, durum, masrafMerkezi, isyeri, paraBirimi, paraBirimiConverted, odemeVadesi, talepEden } = data;
+  const { summary, monthlyTrend, tedarikci, durum, masrafMerkezi, paraBirimi, odemeVadesi } = data;
 
-  // Aylık trend (zaman sıralamasını koru)
   const trendData = (monthlyTrend || []).slice(0, 12).reverse().map(item => ({
     name: item.ay,
     'Toplam Tutar': item.toplamTutar,
     'Sipariş Adedi': item.siparisAdedi,
   }));
 
-  // Teslim durumu - full + sliced
   const durumFull = (durum || [])
     .slice().sort((a, b) => (b.siparisAdedi || 0) - (a.siparisAdedi || 0))
     .map(item => ({ name: item.durum, value: item.siparisAdedi }));
   const durumData = showAllDurum ? durumFull : durumFull.slice(0, TOP_N);
 
-  // Masraf merkezi - full + sliced
   const masrafFull = (masrafMerkezi || [])
     .slice().sort((a, b) => (b.toplamTutar || 0) - (a.toplamTutar || 0))
     .map(item => ({ name: item.masrafMerkezi?.substring(0, 20) || 'Belirsiz', value: item.toplamTutar }));
   const masrafData = showAllMasraf ? masrafFull : masrafFull.slice(0, TOP_N);
 
-  // Tedarikçi - full + sliced
   const tedFull = (tedarikci || [])
     .slice().sort((a, b) => (b.toplamTutar || 0) - (a.toplamTutar || 0))
     .map(item => ({ name: item.tedarikci?.substring(0, 20) || 'Belirsiz', value: item.toplamTutar }));
   const tedData = showAllTedarikci ? tedFull : tedFull.slice(0, TOP_N);
 
-  // Para birimi - full + sliced
   const paraBirimiFull = (paraBirimi || [])
     .slice().sort((a, b) => (b.toplamTutar || 0) - (a.toplamTutar || 0))
     .map(item => ({ name: item.paraBirimi || 'TRY', value: item.toplamTutar || 0 }));
   const paraBirimiData = showAllParaBirimi ? paraBirimiFull : paraBirimiFull.slice(0, TOP_N);
 
-  // Ödeme vadesi tutar - full + sliced
   const odemeFull = (odemeVadesi || [])
     .filter(item => item.odemeVadesi !== 'Belirsiz')
     .slice().sort((a, b) => (b.toplamTutar || 0) - (a.toplamTutar || 0))
     .map(item => ({ name: item.odemeVadesi, value: item.toplamTutar }));
   const odemeData = showAllOdeme ? odemeFull : odemeFull.slice(0, TOP_N);
 
-  // Ödeme vadesi adet - full + sliced
   const odemeAdetFull = (odemeVadesi || [])
     .filter(item => item.odemeVadesi !== 'Belirsiz')
     .slice().sort((a, b) => (b.siparisAdedi || b.kayitAdedi || 0) - (a.siparisAdedi || a.kayitAdedi || 0))
     .map(item => ({ name: item.odemeVadesi, value: item.siparisAdedi || item.kayitAdedi || 0 }));
   const odemeAdetData = showAllOdemeAdet ? odemeAdetFull : odemeAdetFull.slice(0, TOP_N);
-
-  // Talep eden - full + sliced
-  const talepFull = (talepEden || [])
-    .slice().sort((a, b) => (b.toplamTutar || 0) - (a.toplamTutar || 0))
-    .map(item => ({ name: item.talepEden?.substring(0, 15) || 'Belirsiz', value: item.toplamTutar }));
-  const talepData = showAllTalep ? talepFull : talepFull.slice(0, TOP_N);
 
   return (
     <div>
@@ -103,7 +87,6 @@ const Dashboard = ({ data, comparisonData = {}, selectedAmbar = 'all' }) => {
         <p>Satın alma süreçlerinizin genel görünümü ve temel performans göstergeleri</p>
       </div>
 
-      {/* KPI Cards */}
       <div className="kpi-grid">
         <div className="kpi-card">
           <div className="kpi-icon blue"><ShoppingCartOutlined /></div>
@@ -131,19 +114,12 @@ const Dashboard = ({ data, comparisonData = {}, selectedAmbar = 'all' }) => {
           <div className="kpi-label">Tedarikçi Sayısı</div>
         </div>
         <div className="kpi-card">
-          <div className="kpi-icon orange"><UserOutlined /></div>
-          <div className="kpi-value">{formatNumber(summary?.totalTalepEden || 0)}</div>
-          <div className="kpi-label">Talep Eden Sayısı</div>
-        </div>
-        
-        <div className="kpi-card">
-          <div className="kpi-icon green"><FieldTimeOutlined /></div>
-          <div className="kpi-value">{data.teslimatSuresi?.ortalamaTeslimatSuresi || 0} Gün</div>
-          <div className="kpi-label">Ort. Teslimat Süresi</div>
+          <div className="kpi-icon green"><CalendarOutlined /></div>
+          <div className="kpi-value">{trendData.length}</div>
+          <div className="kpi-label">Aktif Ay Sayısı</div>
         </div>
       </div>
 
-      {/* Fabrika Karşılaştırma Toggle */}
       <div style={{ padding: '0 32px 8px' }}>
         <CompareSwitch
           isVisible={selectedAmbar === 'all'}
@@ -152,7 +128,6 @@ const Dashboard = ({ data, comparisonData = {}, selectedAmbar = 'all' }) => {
         />
       </div>
 
-      {/* Charts */}
       <div className="charts-grid">
         {isCompareMode && selectedAmbar === 'all' ? (
           <>
@@ -190,11 +165,6 @@ const Dashboard = ({ data, comparisonData = {}, selectedAmbar = 'all' }) => {
             <div style={showAllOdemeAdet ? { gridColumn: 'span 2' } : {}}>
               <SwitchableChart title="Ödeme Vadesi Dağılımı (Adet)" data={odemeAdetData} dataKey="value" nameKey="name" defaultType="bar" height={300} sort={false} expanded={showAllOdemeAdet} />
               {odemeAdetFull.length > TOP_N && <ShowAllBtn show={showAllOdemeAdet} onToggle={() => setShowAllOdemeAdet(v => !v)} total={odemeAdetFull.length} />}
-            </div>
-
-            <div style={showAllTalep ? { gridColumn: 'span 2' } : {}}>
-              <SwitchableChart title="Talep Edenlere Göre Tutar" data={talepData} dataKey="value" nameKey="name" defaultType="bar" valueFormatter={formatCurrency} height={300} sort={false} expanded={showAllTalep} showPct={true} />
-              {talepFull.length > TOP_N && <ShowAllBtn show={showAllTalep} onToggle={() => setShowAllTalep(v => !v)} total={talepFull.length} />}
             </div>
           </>
         )}

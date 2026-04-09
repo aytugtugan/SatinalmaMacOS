@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ConfigProvider, Select, Spin } from 'antd';
+import { ConfigProvider, Select, Spin, message } from 'antd';
 import trTR from 'antd/locale/tr_TR';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
-import TalepAnaliz from './pages/TalepAnaliz';
 import SiparisAnaliz from './pages/SiparisAnaliz';
 import TedarikciAnaliz from './pages/TedarikciAnaliz';
 import FinansalAnaliz from './pages/FinansalAnaliz';
@@ -12,6 +11,7 @@ import IhaleYonetimi from './pages/IhaleYonetimi';
 import IhaleRaporlari from './pages/IhaleRaporlari';
 import TedarikciKategori from './pages/TedarikciKategori';
 import TedarikciKategoriRaporlari from './pages/TedarikciKategoriRaporlari';
+import VoiceSummaryPanel from './pages/VoiceSummaryPanel';
 import PdfExportModal from './components/PdfExportModal';
 import { ShopOutlined, ReloadOutlined, MinusOutlined, FullscreenOutlined, FullscreenExitOutlined, CloseOutlined, ClockCircleOutlined, FilePdfOutlined } from '@ant-design/icons';
 import './styles.css';
@@ -32,6 +32,7 @@ const App = () => {
   const [updateVersion, setUpdateVersion] = useState('');
   const [downloadPercent, setDownloadPercent] = useState(0);
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
+  const [noFilterModeEnabled, setNoFilterModeEnabled] = useState(false);
 
   // Saat güncelleyici
   useEffect(() => {
@@ -165,11 +166,50 @@ const App = () => {
     loadDashboardData(selectedAmbar);
     loadAllData();
     loadComparisonData();
+    (async () => {
+      try {
+        const state = await window.api?.getNoFilterEndpointState?.();
+        if (state?.success) setNoFilterModeEnabled(!!state.enabled);
+      } catch (err) {
+        console.error('getNoFilterEndpointState error:', err);
+      }
+    })();
   }, []);
 
   // Ambar degistiginde verileri yeniden yukle
   useEffect(() => {
     loadDashboardData(selectedAmbar);
+  }, [selectedAmbar]);
+
+  // Gizli kisayol: Ctrl + Alt + Shift + N
+  // Endpoint modunu standart <-> no-filter olarak degistirir.
+  useEffect(() => {
+    const onKeyDown = async (e) => {
+      const target = e.target;
+      const tag = target?.tagName?.toLowerCase?.() || '';
+      const isTyping = tag === 'input' || tag === 'textarea' || target?.isContentEditable;
+      if (isTyping) return;
+
+      if (e.ctrlKey && e.altKey && e.shiftKey && (e.code === 'KeyN' || e.key === 'N' || e.key === 'n')) {
+        e.preventDefault();
+        try {
+          const result = await window.api?.toggleNoFilterEndpoint?.();
+          if (result?.success) {
+            setNoFilterModeEnabled(!!result.enabled);
+            message.info(result.enabled ? 'Veri modu: No-Filter endpoint aktif' : 'Veri modu: Standart endpoint aktif');
+            loadAmbarList();
+            loadDashboardData(selectedAmbar);
+            loadAllData();
+            loadComparisonData();
+          }
+        } catch (err) {
+          console.error('toggleNoFilterEndpoint error:', err);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, [selectedAmbar]);
 
   const handleRefresh = () => {
@@ -205,8 +245,6 @@ const App = () => {
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard data={dashboardData} columns={columnMapping} comparisonData={comparisonData} selectedAmbar={selectedAmbar} />;
-      case 'talep':
-        return <TalepAnaliz data={dashboardData} columns={columnMapping} comparisonData={comparisonData} selectedAmbar={selectedAmbar} />;
       case 'siparis':
         return <SiparisAnaliz data={dashboardData} columns={columnMapping} comparisonData={comparisonData} selectedAmbar={selectedAmbar} />;
       case 'tedarikci':
@@ -214,7 +252,7 @@ const App = () => {
       case 'finansal':
         return <FinansalAnaliz data={dashboardData} columns={columnMapping} comparisonData={comparisonData} selectedAmbar={selectedAmbar} />;
       case 'detay':
-        return <DetayliRapor data={allData} selectedIsyeri={selectedAmbar} columns={columnMapping} />;
+        return <DetayliRapor data={allData} selectedIsyeri={selectedAmbar} columns={columnMapping} noFilterModeEnabled={noFilterModeEnabled} />;
       case 'ihale':
         return <IhaleYonetimi selectedAmbar={selectedAmbar} />;
       case 'ihaleRapor':
@@ -223,6 +261,8 @@ const App = () => {
         return <TedarikciKategori />;
       case 'tedarikciKategoriRapor':
         return <TedarikciKategoriRaporlari />;
+      case 'sesliOzet':
+        return <VoiceSummaryPanel dashboardData={dashboardData} comparisonData={comparisonData} selectedAmbar={selectedAmbar} ambarList={ambarList} />;
       default:
         return <Dashboard data={dashboardData} columns={columnMapping} comparisonData={comparisonData} selectedAmbar={selectedAmbar} />;
     }
@@ -304,6 +344,19 @@ const App = () => {
                     }))
                   ]}
                 />
+                {noFilterModeEnabled && (
+                  <span
+                    style={{
+                      marginLeft: 10,
+                      color: '#dc2626',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      letterSpacing: 0.2,
+                    }}
+                  >
+                    FILTRESIZ MOD AKTIF
+                  </span>
+                )}
               </div>
               <div className="filter-right">
                 <div className="clock-display">

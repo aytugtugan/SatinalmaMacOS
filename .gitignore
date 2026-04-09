@@ -1,1 +1,6 @@
 node_modules
+.env
+masaustu/release/
+masaustu/dist/
+masaustu/node_modules/
+masaustu/out/

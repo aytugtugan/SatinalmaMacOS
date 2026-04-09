@@ -1,22 +1,26 @@
 {
   "name": "satinalma-rapor",
-  "version": "1.0.28",
+  "version": "1.0.30",
   "description": "Satın Alma Rapor Uygulaması",
   "main": "main.js",
   "scripts": {
     "start": "concurrently \"npm run webpack\" \"wait-on dist/bundle.js && electron .\"",
     "webpack": "webpack --mode development --watch",
-    "build": "webpack --mode production && electron-builder && node scripts/embed-icon-exe.js",
+    "build:win": "webpack --mode production && electron-builder --win && node scripts/embed-icon-exe.js",
+    "build:mac": "webpack --mode production && electron-builder --mac",
+    "publish:win": "webpack --mode production && electron-builder --win --publish always && node scripts/embed-icon-exe.js",
+    "publish:mac": "webpack --mode production && electron-builder --mac --publish always",
     "build:win-unpacked": "webpack --mode production && electron-builder --win --dir --publish never -c.compression=store",
     "build:win-unpacked:quick": "electron-builder --win --dir --publish never -c.compression=store",
     "electron": "electron .",
-    "api": "node api/server.js"
+    "api": "node api/server.js",
+    "generate-icns": "node scripts/generate-icns.js"
   },
   "build": {
     "appId": "com.satinalma.rapor",
     "productName": "Satin Alma Rapor",
     "directories": {
-      "output": "C:\\Users\\acemoglu\\Desktop"
+      "output": "release"
     },
     "forceCodeSigning": false,
     "artifactName": "Satin.Alma.Rapor.Setup.${version}.${ext}",
@@ -26,7 +30,65 @@
         "zip"
       ],
       "icon": "assets/icon.ico",
-      "signAndEditExecutable": false
+      "signAndEditExecutable": false,
+      "extraFiles": [
+        {
+          "from": "assets/uninstallerIcon.ico",
+          "to": "uninstallerIcon.ico"
+        }
+      ],
+      "publish": [
+        {
+          "provider": "github",
+          "owner": "aytugtugan",
+          "repo": "SatinalmaWin",
+          "releaseType": "release"
+        }
+      ]
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.business",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null,
+      "publish": [
+        {
+          "provider": "github",
+          "owner": "aytugtugan",
+          "repo": "SatinalmaMacOS",
+          "releaseType": "release"
+        }
+      ]
+    },
+    "dmg": {
+      "title": "Satin Alma Rapor ${version}",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      }
     },
     "nsis": {
       "oneClick": false,
@@ -41,24 +103,10 @@
       "runAfterFinish": true,
       "include": "installer.nsh"
     },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "mustafabakoglu",
-        "repo": "Satin-alma",
-        "releaseType": "release"
-      }
-    ],
     "extraResources": [
       {
         "from": "ocak_2026_data.json",
         "to": "ocak_2026_data.json"
-      }
-    ],
-    "extraFiles": [
-      {
-        "from": "assets/uninstallerIcon.ico",
-        "to": "uninstallerIcon.ico"
       }
     ],
     "files": [
@@ -97,6 +145,7 @@
     "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
     "css-loader": "^7.1.2",
+    "dmg-license": "^1.0.11",
     "electron": "^36.3.0",
     "electron-builder": "^26.4.0",
     "html-webpack-plugin": "^5.6.3",

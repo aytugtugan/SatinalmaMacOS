@@ -194,7 +194,7 @@ const DosyaYonetimi = ({ visible, siparisNo, onClose, onDosyaSayisiDegisti }) =>
           </Button>
         </div>
         <div style={{ fontSize: 11, color: '#60a5fa', marginTop: 8 }}>
-          Desteklenen: Görseller, PDF, Word, Excel, PowerPoint, TXT, CSV, ZIP, RAR (maks 25MB)
+          Desteklenen: Görseller, PDF, Word, Excel, PowerPoint, TXT, CSV, ZIP, RAR, .000087 (maks 25MB)
         </div>
       </div>
 

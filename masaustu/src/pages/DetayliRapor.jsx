@@ -8,7 +8,7 @@ import { formatCurrency, formatUnitPrice } from '../components/SwitchableChart';
 
 const { RangePicker } = DatePicker;
 
-const DetayliRapor = ({ data, selectedIsyeri, columns }) => {
+const DetayliRapor = ({ data, selectedIsyeri, columns, noFilterModeEnabled = false }) => {
   const [searchText, setSearchText] = useState('');
   const [dateRange, setDateRange] = useState(null);
   const [pageSize, setPageSize] = useState(20);
@@ -63,7 +63,7 @@ const DetayliRapor = ({ data, selectedIsyeri, columns }) => {
   const filteredData = useMemo(() => {
     let result = normalizedData || [];
 
-    // Ambar filtresi (KOZLU YAĞ sanal ambar dahil)
+    // Fabrika filtresi (legacy: AMBAR, no-filter: ISYERI)
     if (selectedIsyeri && selectedIsyeri !== 'all') {
       const norm = (s) => (s || '')
         .toString()
@@ -76,15 +76,16 @@ const DetayliRapor = ({ data, selectedIsyeri, columns }) => {
         .replace(/Ç/g, 'C')
         .replace(/\s+/g, ' ')
         .trim();
-      const getAmbar = (item) => item['AMBAR'] || item['[AMBAR]'] || item['ISYERI'] || item['İŞ YERİ'] || '';
+      const getAmbar = (item) => item['AMBAR'] || item['[AMBAR]'] || '';
+      const getIsyeri = (item) => item['ISYERI'] || item['İŞ YERİ'] || item['ISYERI_NO'] || item['İŞYERİ NO'] || '';
       const getFirmaNo = (item) => String(item['FIRMA_NUMARASI'] || item['FİRMA NUMARASI'] || item['FIRMA NUMARASI'] || '').trim();
       const sel = norm(selectedIsyeri);
-      if (sel === 'KOZLU YAG') {
+      if (!noFilterModeEnabled && sel === 'KOZLU YAG') {
         result = result.filter(item => norm(getAmbar(item)) === 'AKHISAR' && getFirmaNo(item) === '400');
-      } else if (sel === 'AKHISAR') {
+      } else if (!noFilterModeEnabled && sel === 'AKHISAR') {
         result = result.filter(item => norm(getAmbar(item)) === 'AKHISAR' && getFirmaNo(item) !== '400');
       } else {
-        result = result.filter(item => norm(getAmbar(item)) === sel);
+        result = result.filter(item => norm(noFilterModeEnabled ? getIsyeri(item) : getAmbar(item)) === sel);
       }
     }
 
@@ -112,7 +113,7 @@ const DetayliRapor = ({ data, selectedIsyeri, columns }) => {
     }
 
     return result;
-  }, [normalizedData, searchText, dateRange, selectedIsyeri, C]);
+  }, [normalizedData, searchText, dateRange, selectedIsyeri, noFilterModeEnabled, C]);
 
   // Sipariş bazlı gruplama
   const groupedData = useMemo(() => {

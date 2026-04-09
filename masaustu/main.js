@@ -4,12 +4,16 @@ autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
 autoUpdater.allowPrerelease = false;
 
-// GitHub release feed URL'sini açıkça belirt
+const IS_MAC = process.platform === 'darwin';
+const IS_WIN = process.platform === 'win32';
+
+// GitHub release feed — platform başına ayrı repo
 autoUpdater.setFeedURL({
   provider: 'github',
-  owner: 'mustafabakoglu',
-  repo: 'Satin-alma',
-  releaseType: 'release'
+  owner: 'aytugtugan',
+  repo: IS_MAC ? 'SatinalmaMacOS' : 'SatinalmaWin',
+  releaseType: 'release',
+  private: false,
 });
 
 // Public repo - token gerekmez
@@ -20,6 +24,8 @@ autoUpdater.logger.transports.file.level = 'info';
 const path = require('path');
 const fs = require('fs');
 const database = require('./database');
+
+const APP_ICON = path.join(__dirname, 'assets', process.platform === 'darwin' ? 'icon.icns' : 'icon.ico');
 
 // Dosya API base URL
 const DOSYA_API_URL = 'http://10.35.20.17:5055';
@@ -54,23 +60,33 @@ function createWindow() {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
     },
-    icon: path.join(__dirname, 'assets', 'icon.ico'),
+    icon: APP_ICON,
     title: 'Satın Alma Rapor Sistemi',
     backgroundColor: '#f5f6f7',
     show: false,
     frame: true,
     autoHideMenuBar: true,
-    fullscreen: true,
-    simpleFullscreen: true,
+    // macOS: titlebar görünsün, simgeler aktif
+    titleBarStyle: IS_MAC ? 'default' : 'default',
+    trafficLightPosition: IS_MAC ? { x: 12, y: 14 } : undefined,
+    fullscreen: false,
     kiosk: false,
   });
 
   mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
 
-  // Pencere hazir oldugunda fullscreen goster
+  // Hazır olunca maximize et (fullscreen değil — ESC sorunu olmaz)
   mainWindow.once('ready-to-show', () => {
-    mainWindow.setFullScreen(true);
+    mainWindow.maximize();
     mainWindow.show();
+  });
+
+  // F11 (Win) veya Ctrl+Cmd+F (Mac) ile tam ekrana girip çıkmayı destekle
+  mainWindow.on('enter-full-screen', () => {
+    if (mainWindow) mainWindow.webContents.send('fullscreen-change', true);
+  });
+  mainWindow.on('leave-full-screen', () => {
+    if (mainWindow) mainWindow.webContents.send('fullscreen-change', false);
   });
 
   // Development modunda DevTools'u ac
@@ -151,19 +167,15 @@ app.whenReady().then(() => {
 
 // Window Control IPC Handlers
 ipcMain.handle('window-minimize', () => {
-  if (mainWindow) {
-    mainWindow.setFullScreen(false);
-    mainWindow.minimize();
-  }
+  if (mainWindow) mainWindow.minimize();
 });
 
 ipcMain.handle('window-maximize', () => {
-  if (mainWindow) {
-    if (mainWindow.isFullScreen()) {
-      mainWindow.setFullScreen(false);
-    } else {
-      mainWindow.setFullScreen(true);
-    }
+  if (!mainWindow) return;
+  if (mainWindow.isMaximized()) {
+    mainWindow.unmaximize();
+  } else {
+    mainWindow.maximize();
   }
 });
 
@@ -172,7 +184,12 @@ ipcMain.handle('window-close', () => {
 });
 
 ipcMain.handle('window-is-maximized', () => {
-  return mainWindow ? mainWindow.isFullScreen() : false;
+  return mainWindow ? mainWindow.isMaximized() : false;
+});
+
+ipcMain.handle('window-toggle-fullscreen', () => {
+  if (!mainWindow) return;
+  mainWindow.setFullScreen(!mainWindow.isFullScreen());
 });
 
 ipcMain.handle('check-for-updates', async () => {
@@ -180,9 +197,8 @@ ipcMain.handle('check-for-updates', async () => {
     console.log('Manuel güncelleme kontrolü başlandı...');
     console.log('autoUpdater config:', {
       provider: 'github',
-      owner: 'mustafabakoglu',
-      repo: 'Satin-alma',
-      updateUrl: autoUpdater.updateUrl
+      owner: 'aytugtugan',
+      repo: IS_MAC ? 'SatinalmaMacOS' : 'SatinalmaWin',
     });
     const result = await autoUpdater.checkForUpdates();
     console.log('Güncelleme kontrolü sonucu:', result);
@@ -280,6 +296,24 @@ ipcMain.handle('test-connection', async () => {
   }
 });
 
+ipcMain.handle('toggle-no-filter-endpoint', async () => {
+  try {
+    const enabled = database.toggleUseNoFilterEndpoint();
+    return { success: true, enabled };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-no-filter-endpoint-state', async () => {
+  try {
+    const enabled = database.getUseNoFilterEndpoint();
+    return { success: true, enabled };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 // ─── Dosya Yönetimi IPC Handlers ────────────────────────────
 
 // Sipariş numarasına ait dosyaları listele
@@ -321,9 +355,9 @@ ipcMain.handle('dosya-yukle', async (event, { siparisNo, aciklama }) => {
       title: 'Dosya Seç',
       properties: ['openFile'],
       filters: [
-        { name: 'Tüm Desteklenen', extensions: ['jpg','jpeg','png','gif','webp','bmp','pdf','doc','docx','xls','xlsx','ppt','pptx','txt','csv','zip','rar'] },
+        { name: 'Tüm Desteklenen', extensions: ['jpg','jpeg','png','gif','webp','bmp','pdf','doc','docx','xls','xlsx','ppt','pptx','txt','csv','zip','rar','000087'] },
         { name: 'Görseller', extensions: ['jpg','jpeg','png','gif','webp','bmp'] },
-        { name: 'Belgeler', extensions: ['pdf','doc','docx','xls','xlsx','ppt','pptx','txt','csv'] },
+        { name: 'Belgeler', extensions: ['pdf','doc','docx','xls','xlsx','ppt','pptx','txt','csv','000087'] },
         { name: 'Arşiv', extensions: ['zip','rar'] },
       ],
     });
@@ -421,7 +455,7 @@ ipcMain.handle('dosya-goruntule', async (event, id) => {
       parent: mainWindow,
       modal: false,
       title: 'Dosya Önizleme',
-      icon: path.join(__dirname, 'assets', 'icon.ico'),
+      icon: APP_ICON,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -444,7 +478,6 @@ ipcMain.handle('dosya-goruntule-url', (event, id) => {
 // ─── İhale IPC Handlers ─────────────────────────────────
 
 const IHALE_API_URL = 'http://10.35.20.17:5055';
-
 async function ihaleFetch(path, options = {}) {
   const res = await fetch(`${IHALE_API_URL}${path}`, {
     headers: { 'Content-Type': 'application/json', ...options.headers },
@@ -462,6 +495,16 @@ async function fetchAllIhaleRecords(extraParams = {}) {
   return json.data || [];
 }
 
+function normalizeIhaleDto(dto = {}) {
+  const masraf = (dto.masraf_merkezi ?? dto.masrafMerkezi ?? dto.MASRAF_MERKEZI ?? '').toString();
+  return {
+    ...dto,
+    masraf_merkezi: masraf,
+    masrafMerkezi: masraf,
+    MASRAF_MERKEZI: masraf,
+  };
+}
+
 ipcMain.handle('ihale-list', async (event, params) => {
   try {
     const qs = new URLSearchParams();
@@ -471,28 +514,30 @@ ipcMain.handle('ihale-list', async (event, params) => {
     if (params?.page) qs.set('page', params.page);
     if (params?.limit) qs.set('limit', params.limit);
     const query = qs.toString();
-    const data = await ihaleFetch(`/api/ihaleler${query ? '?' + query : ''}`);
+    let data = await ihaleFetch(`/api/ihaleler${query ? '?' + query : ''}`);
     return { success: true, ...data };
   } catch (e) { return { success: false, error: e.message }; }
 });
 
 ipcMain.handle('ihale-get', async (event, siraNo) => {
   try {
-    const data = await ihaleFetch(`/api/ihaleler/${siraNo}`);
+    let data = await ihaleFetch(`/api/ihaleler/${siraNo}`);
     return { success: true, ...data };
   } catch (e) { return { success: false, error: e.message }; }
 });
 
 ipcMain.handle('ihale-create', async (event, dto) => {
   try {
-    const data = await ihaleFetch('/api/ihaleler', { method: 'POST', body: JSON.stringify(dto) });
+    const normalizedDto = normalizeIhaleDto(dto);
+    const data = await ihaleFetch('/api/ihaleler', { method: 'POST', body: JSON.stringify(normalizedDto) });
     return { success: true, ...data };
   } catch (e) { return { success: false, error: e.message }; }
 });
 
 ipcMain.handle('ihale-update', async (event, { siraNo, dto }) => {
   try {
-    const data = await ihaleFetch(`/api/ihaleler/${siraNo}`, { method: 'PUT', body: JSON.stringify(dto) });
+    const normalizedDto = normalizeIhaleDto(dto);
+    const data = await ihaleFetch(`/api/ihaleler/${siraNo}`, { method: 'PUT', body: JSON.stringify(normalizedDto) });
     return { success: true, ...data };
   } catch (e) { return { success: false, error: e.message }; }
 });
@@ -589,7 +634,7 @@ function calcTedarikci(records) {
 function calcMasrafMerkezi(records) {
   const map = {};
   for (const r of records) {
-    const m = (r.masraf_merkezi || '').trim() || 'Belirtilmemiş';
+    const m = (r.masraf_merkezi || r.masrafMerkezi || r.MASRAF_MERKEZI || '').toString().trim() || 'Belirtilmemis';
     if (!map[m]) map[m] = { masraf_merkezi: m, ihale_sayisi: 0, toplam_kazanc_tl: 0 };
     map[m].ihale_sayisi++;
     map[m].toplam_kazanc_tl += (r.kazanc_tutari_tl || 0);
@@ -811,3 +856,9 @@ ipcMain.handle('tedarikci-kategori-rapor-kategori-listesi', async () => {
     return { success: true, ...data };
   } catch (e) { return { success: false, error: e.message }; }
 });
+
+
+
+
+
+

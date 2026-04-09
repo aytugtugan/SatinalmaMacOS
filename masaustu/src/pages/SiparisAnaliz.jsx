@@ -2,7 +2,7 @@
 import { SwitchableChart, formatNumber, formatCurrency } from '../components/SwitchableChart';
 import CompareSwitch from '../components/CompareSwitch';
 import ComparisonChart from '../components/ComparisonChart';
-import { ShoppingCartOutlined, CalendarOutlined, UserSwitchOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { ShoppingCartOutlined, CalendarOutlined, UserSwitchOutlined, CheckCircleOutlined } from '@ant-design/icons';
 
 const TOP_N = 10;
 
@@ -26,7 +26,7 @@ const SiparisAnaliz = ({ data, comparisonData = {}, selectedAmbar = 'all' }) => 
   const [showAllDurum, setShowAllDurum] = useState(false);
 
   if (!data) return null;
-  const { monthlyTrend, durum, summary, teslimatSuresi } = data;
+  const { monthlyTrend, durum, summary } = data;
 
   const trendData = (monthlyTrend || []).slice(0, 12).reverse().map(item => ({
     name: item.ay,
@@ -68,9 +68,9 @@ const SiparisAnaliz = ({ data, comparisonData = {}, selectedAmbar = 'all' }) => 
           <div className="kpi-label">Toplam Sipariş</div>
         </div>
         <div className="kpi-card">
-          <div className="kpi-icon purple"><ClockCircleOutlined /></div>
-          <div className="kpi-value">{teslimatSuresi?.ortalamaTeslimatSuresi || 0} Gün</div>
-          <div className="kpi-label">Ort. Teslimat Süresi</div>
+          <div className="kpi-icon purple"><CheckCircleOutlined /></div>
+          <div className="kpi-value">{formatNumber(summary?.totalTeslimat || 0)}</div>
+          <div className="kpi-label">Teslim Edilen</div>
         </div>
       </div>
 

@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('api', {
   getAmbarList: () => ipcRenderer.invoke('get-ambar-list'),
   getFactoryComparison: () => ipcRenderer.invoke('get-factory-comparison'),
   testConnection: () => ipcRenderer.invoke('test-connection'),
+  toggleNoFilterEndpoint: () => ipcRenderer.invoke('toggle-no-filter-endpoint'),
+  getNoFilterEndpointState: () => ipcRenderer.invoke('get-no-filter-endpoint-state'),
   // Window controls
   windowMinimize: () => ipcRenderer.invoke('window-minimize'),
   windowMaximize: () => ipcRenderer.invoke('window-maximize'),
