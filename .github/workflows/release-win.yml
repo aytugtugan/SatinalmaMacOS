@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   release-win:
+    if: github.repository == 'aytugtugan/SatinalmaWin'
     runs-on: windows-latest
 
     defaults:
